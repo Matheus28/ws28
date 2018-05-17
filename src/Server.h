@@ -4,16 +4,46 @@
 #include <memory>
 #include <string_view>
 #include <map>
+#include <string>
 
 #include "Client.h"
 
 namespace ws28 {
+	class Server;
+	
+	struct HTTPRequest {
+		std::string_view method;
+		std::string_view path;
+		
+		// Header keys are always lower case
+		const std::multimap<std::string_view, std::string_view> &headers;
+	};
+	
+	class HTTPResponse {
+	public:
+		
+		HTTPResponse& status(int v){ statusCode = v; return *this; }
+		HTTPResponse& send(std::string_view v){ if(statusCode == 0) statusCode = 200; body.append(v); return *this; }
+		
+		// Appends a response header. The following headers cannot be changed:
+		// Connection: close
+		// Content-Length: body.size()
+		HTTPResponse& header(std::string_view key, std::string_view value){ headers.emplace(key, value); return *this; }
+		
+	private:
+		int statusCode = 0;
+		std::string body;
+		std::multimap<std::string, std::string> headers;
+		
+		friend class Client;
+	};
 	
 	class Server {
 		typedef bool (*CheckConnectionFn)(Client *, std::string_view path, const std::multimap<std::string_view, std::string_view> &headers);
 		typedef void (*ClientConnectedFn)(Client *);
 		typedef void (*ClientDisconnectedFn)(Client *);
 		typedef void (*ClientDataFn)(Client *, const char *, size_t);
+		typedef void (*HTTPRequestFn)(HTTPRequest&, HTTPResponse&);
 	public:
 		
 		// Note: if you provide a SSL_CTX, this server will listen to *BOTH* secure and insecure connections at that port,
@@ -44,6 +74,12 @@ namespace ws28 {
 		// Note that both text and binary op codes end up here
 		void SetClientDataCallback(ClientDataFn v){ m_fnClientData = v; }
 		
+		// This callback is called when a normal http request is received
+		// If you don't send anything in response, the status code is 404
+		// If you send anything in response without setting a specific status code, it will be 200
+		// Connections that call this callback never lead to a connection
+		void SetHTTPCallback(HTTPRequestFn v){ m_fnHTTPRequest = v;}
+		
 		SSL_CTX* GetSSLContext() const { return m_pSSLContext; }
 		
 	private:
@@ -68,6 +104,7 @@ namespace ws28 {
 		ClientConnectedFn m_fnClientConnected;
 		ClientDisconnectedFn m_fnClientDisconnected;
 		ClientDataFn m_fnClientData;
+		HTTPRequestFn m_fnHTTPRequest;
 		
 		friend class Client;
 	};

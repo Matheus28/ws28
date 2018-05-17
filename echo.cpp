@@ -1,4 +1,5 @@
 #include "src/Server.h"
+#include <sstream>
 
 int main(){
 	ws28::Server s{8080, uv_default_loop()};
@@ -16,6 +17,18 @@ int main(){
 	
 	s.SetClientDataCallback([](ws28::Client *client, const char *data, size_t len){
 		printf("Client %d: %.*s\n", (int) (intptr_t) client->GetUserData(), (int) len, data);
+	});
+	
+	s.SetHTTPCallback([](ws28::HTTPRequest &req, ws28::HTTPResponse &res){
+		std::stringstream ss;
+		ss << "Hi, you issued a " << req.method << " to " << req.path << "\r\n";
+		ss << "Headers:\r\n";
+		
+		for(auto &[key, value] : req.headers){
+			ss << key << ": " << value << "\r\n";
+		}
+		
+		res.send(ss.str());
 	});
 	
 	puts("Listening");

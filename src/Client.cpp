@@ -3,6 +3,7 @@
 #include "sha1.h"
 #include "base64.h"
 #include <string>
+#include <sstream>
 
 namespace ws28 {
 	
@@ -281,9 +282,38 @@ void Client::OnSocketData(const char *data, size_t len){
 			}
 			
 			if(!hasUpgradeHeader){
-				//FIXME: http request
-				//Debug("Sending back Pong in response to: %s", m_Buffer);
-				Write("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\n\r\nPong!");
+				HTTPRequest req{
+					method,
+					path,
+					headers,
+				};
+				
+				HTTPResponse res;
+				
+				if(m_pServer->m_fnHTTPRequest) m_pServer->m_fnHTTPRequest(req, res);
+				
+				if(res.statusCode == 0) res.statusCode = 404;
+				if(res.statusCode < 200 || res.statusCode >= 1000) res.statusCode = 500;
+				
+				
+				const char *statusCodeText = "WS28"; // Too lazy to create a table of those
+				
+				std::stringstream ss;
+				ss << "HTTP/1.1 " << res.statusCode << " " << statusCodeText << "\r\n";
+				ss << "Connection: close\r\n";
+				ss << "Content-Length: " << res.body.size() << "\r\n";
+				
+				for(auto &[key, value] : res.headers){
+					ss << key << ": " << value << "\r\n";
+				}
+				
+				ss << "\r\n";
+				
+				ss << res.body;
+				
+				std::string str = ss.str();
+				Write(str.data(), str.size());
+				
 				Destroy();
 				return;
 			}
