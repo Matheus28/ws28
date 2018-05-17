@@ -21,7 +21,7 @@ namespace ws28 {
 			const std::pair<T, T> &p;
 		};
 		
-		bool equalsi(const std::string_view &a, const std::string_view &b);
+		bool equalsi(std::string_view a, std::string_view b);
 	}
 	
 	class Server;

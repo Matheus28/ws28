@@ -8,7 +8,7 @@
 namespace ws28 {
 	
 namespace detail {
-	bool equalsi(const std::string_view &a, const std::string_view &b){
+	bool equalsi(std::string_view a, std::string_view b){
 		if(a.size() != b.size()) return false;
 		for(size_t i = 0; i < a.size(); ++i){
 			if(tolower(a[i]) != tolower(b[i])) return false;
