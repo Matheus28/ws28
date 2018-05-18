@@ -222,6 +222,7 @@ void Client::OnSocketData(char *data, size_t len){
 	auto Bail = [&](){
 		// Copy partial HTTP headers to our buffer
 		if(usingLocalBuffer){
+			assert(m_iBufferPos == 0);
 			memcpy(m_Buffer, buffer, bufferLen);
 			m_iBufferPos = bufferLen;
 		}
@@ -466,8 +467,7 @@ void Client::OnSocketData(char *data, size_t len){
 		// Op codes can also never be fragmented
 		if(header.opcode() >= 0x08){
 			if(!header.fin()){
-				Destroy();
-				return;
+				return Destroy();
 			}
 			
 			Unmask((char*) curPosition, frameLength);
@@ -479,8 +479,7 @@ void Client::OnSocketData(char *data, size_t len){
 		}else{
 			if(!m_Frames.empty()){
 				if(header.opcode() != 0){
-					Destroy(); // Must be continuation frame op code
-					return;
+					return Destroy(); // Must be continuation frame op code
 				}
 			}
 			
@@ -514,17 +513,20 @@ void Client::OnSocketData(char *data, size_t len){
 			}
 			
 		}
-
-		size_t amount = (curPosition - buffer) + frameLength;
 		
-		if(usingLocalBuffer){
-			buffer += amount;
-			bufferLen -= amount;
-		}else{
-			memmove(m_Buffer, &m_Buffer[amount], m_iBufferPos - amount);
-			m_iBufferPos -= amount;
-			// buffer = m_Buffer
-			bufferLen = m_iBufferPos;
+		// Consume buffer
+		{
+			size_t amount = (curPosition - buffer) + frameLength;
+			
+			if(usingLocalBuffer){
+				buffer += amount;
+				bufferLen -= amount;
+			}else{
+				memmove(m_Buffer, &m_Buffer[amount], m_iBufferPos - amount);
+				m_iBufferPos -= amount;
+				// buffer = m_Buffer
+				bufferLen = m_iBufferPos;
+			}
 		}
 	}
 	
