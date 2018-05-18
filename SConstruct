@@ -12,7 +12,7 @@ if env['PLATFORM'] == 'win32':
 	)
 else:
 	env.Append(
-		CXXFLAGS = ['-std=c++14', '-Wall'],
+		CXXFLAGS = ['-std=c++14', '-Wall', '-O3'],
 		LIBS = ['ssl', 'crypto', 'uv']
 	)
 
