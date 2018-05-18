@@ -1,8 +1,16 @@
 #include "Server.h"
 
+#ifndef _WIN32
+#include <signal.h>
+#endif
+
 namespace ws28{
 
 Server::Server(int port, uv_loop_t *loop, bool ipv4Only, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx){
+#ifndef _WIN32
+	signal(SIGPIPE, SIG_IGN);
+#define
+	
 	m_fnCheckConnection = [](HTTPRequest &req) -> bool {
 		const char *host = nullptr;
 		
