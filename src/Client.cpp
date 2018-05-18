@@ -660,12 +660,18 @@ void Client::Cork(bool v){
 	uv_os_fd_t fd;
 	uv_fileno((uv_handle_t*) m_pSocket, &fd);
 	
+	// Shamelessly copied from uWebSockets
 #if defined(TCP_CORK)
-	// Linux & SmartOS have proper TCP_CORK
+	// Linux
 	setsockopt(fd, IPPROTO_TCP, TCP_CORK, &enable, sizeof(int));
 #elif defined(TCP_NOPUSH)
-	// Mac OS X & FreeBSD have TCP_NOPUSH
+	// Mac OS X & FreeBSD
 	setsockopt(fd, IPPROTO_TCP, TCP_NOPUSH, &enable, sizeof(int));
+	
+	// MacOS needs this to flush the messages out
+	if(!enable){
+		::send(fd, "", 0, MSG_NOSIGNAL);
+	}
 #endif
 }
 
