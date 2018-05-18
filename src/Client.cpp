@@ -545,6 +545,36 @@ std::unique_ptr<char[]> Client::ToUniqueBuffer(const char *buf, size_t len){
 void Client::WriteRaw(std::unique_ptr<char[]> data, size_t len){
 	if(!m_pSocket) return;
 	
+	// Try to write without allocating memory first, if that doesn't work, we call WriteRawQueue
+	uv_buf_t buf;
+	buf.base = data.get();
+	buf.len = len;
+	
+	int written = uv_try_write((uv_stream_t*) m_pSocket, &buf, 1);
+	if(written != UV_EAGAIN){
+		if(written == 0){
+			WriteRawQueue(std::move(data), len);
+		}else if(written > 0){
+			if(written == len) return;
+			
+			// Partial write
+			
+			// This is bad, but it should be rare
+			// We need to reallocate the buffer so it gets freed properly
+			// There are better ways to do this, but I'm lazy
+			
+			WriteRawQueue(ToUniqueBuffer(data.get() + written, len - written), len - written);
+		}else{
+			// Write error
+			Destroy();
+			return;
+		}
+	}else{
+		WriteRawQueue(std::move(data), len);
+	}
+}
+
+void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
 	struct CustomWriteRequest {
 		uv_write_t req;
 		uv_buf_t buf;
@@ -557,7 +587,7 @@ void Client::WriteRaw(std::unique_ptr<char[]> data, size_t len){
 	request->buf.len = len;
 	request->client = this;
 	request->data = std::move(data);
-
+	
 	if(uv_write(&request->req, (uv_stream_t*) m_pSocket, &request->buf, 1, [](uv_write_t* req, int status){
 		auto request = (CustomWriteRequest*) req;
 
