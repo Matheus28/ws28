@@ -413,7 +413,14 @@ void Client::OnSocketData(const char *data, size_t len){
 		
 		auto Unmask = [&](char *data, size_t len){
 			if(header.mask()){
-				for(size_t i = 0; i < len; ++i){
+				for(size_t i = 0; i < (len & ~3); i += 4){
+					data[i + 0] ^= maskKey[0];
+					data[i + 1] ^= maskKey[1];
+					data[i + 2] ^= maskKey[2];
+					data[i + 3] ^= maskKey[3];
+				}
+				
+				for(size_t i = len & ~3; i < len; ++i){
 					data[i] ^= maskKey[i % 4];
 				} 
 			}
