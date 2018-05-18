@@ -276,6 +276,7 @@ void Client::OnSocketData(const char *data, size_t len){
 		}
 		
 		HTTPRequest req{
+			m_pServer,
 			method,
 			path,
 			headers,

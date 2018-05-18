@@ -11,6 +11,7 @@ namespace ws28 {
 	class Server;
 	
 	struct HTTPRequest {
+		Server *server;
 		const char *method;
 		const char *path;
 		
