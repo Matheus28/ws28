@@ -75,8 +75,8 @@ namespace ws28 {
 		void EncryptAndWrite(const char *data, size_t len);
 		void WriteRaw(const char *data, size_t len);
 		
-		void OnRawSocketData(const char *data, size_t len);
-		void OnSocketData(const char *data, size_t len);
+		void OnRawSocketData(char *data, size_t len);
+		void OnSocketData(char *data, size_t len);
 		void ProcessDataFrame(uint8_t opcode, const char *data, size_t len);
 		
 		void InitSecure();
@@ -86,8 +86,6 @@ namespace ws28 {
 		void Write(const char *data, size_t len);
 		void Write(std::unique_ptr<char[]> data, size_t len);
 		void WriteRaw(std::unique_ptr<char[]> data, size_t len);
-		
-		void Consume(size_t amount);
 		
 		void ClearServer(){ m_pServer = nullptr; }
 		
