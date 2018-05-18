@@ -100,11 +100,11 @@ namespace ws28 {
 		SSL_CTX *m_pSSLContext;
 		std::vector<Client*> m_Clients;
 		
-		CheckConnectionFn m_fnCheckConnection;
-		ClientConnectedFn m_fnClientConnected;
-		ClientDisconnectedFn m_fnClientDisconnected;
-		ClientDataFn m_fnClientData;
-		HTTPRequestFn m_fnHTTPRequest;
+		CheckConnectionFn m_fnCheckConnection = nullptr;
+		ClientConnectedFn m_fnClientConnected = nullptr;
+		ClientDisconnectedFn m_fnClientDisconnected = nullptr;
+		ClientDataFn m_fnClientData = nullptr;
+		HTTPRequestFn m_fnHTTPRequest = nullptr;
 		
 		friend class Client;
 	};
