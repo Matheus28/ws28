@@ -596,7 +596,7 @@ void Client::WriteRaw(std::unique_ptr<char[]> data, size_t len){
 		auto request = (CustomWriteRequest*) req;
 
 		if(status < 0){
-			delete request->client;
+			request->client->Destroy();
 		}
 		
 		delete request;
