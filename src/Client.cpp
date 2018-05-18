@@ -235,7 +235,7 @@ void Client::OnSocketData(const char *data, size_t len){
 			str = endOfLine + 2;
 		}
 		
-		detail::multihash headers;
+		RequestHeaders headers;
 		
 		for(;;) {
 			auto nextLine = strstr(str, "\r\n");
@@ -270,7 +270,7 @@ void Client::OnSocketData(const char *data, size_t len){
 			*keyEnd = '\0';
 			*valueEnd = '\0';
 			
-			headers.insert({ keyStart, valueStart });
+			headers.Set(keyStart, valueStart);
 			
 			str = nextLine + 2;
 		}
@@ -283,16 +283,11 @@ void Client::OnSocketData(const char *data, size_t len){
 		};
 		
 		{
-			bool hasUpgradeHeader = false;
-			
-			for(auto &p : headers.equal_range_ex("upgrade")){
-				if(hasUpgradeHeader)  return MalformedRequest();
-				hasUpgradeHeader = true;
-				
-				if(!detail::equalsi(p.second, "websocket")) return MalformedRequest();
-			}
-			
-			if(!hasUpgradeHeader){
+			if(headers.m_hUpgrade != nullptr){
+				if(!detail::equalsi(headers.m_hUpgrade, "websocket")){
+					return MalformedRequest();
+				}
+			}else{
 				
 				HTTPResponse res;
 				
@@ -325,48 +320,19 @@ void Client::OnSocketData(const char *data, size_t len){
 			}
 		}
 		
-		{
-			bool hasConnectionHeader = false;
-			
-			for(auto &p : headers.equal_range_ex("connection")){
-				if(hasConnectionHeader) return MalformedRequest();
-				hasConnectionHeader = true;
-				
-				if(!detail::equalsi(p.second, "upgrade")) return MalformedRequest();
-			}
-			
-			if(!hasConnectionHeader) return MalformedRequest();
-		}
+		if(headers.m_hConnection == nullptr) return MalformedRequest();
+		if(!detail::equalsi(headers.m_hConnection, "upgrade")) return MalformedRequest();
 		
 		bool sendMyVersion = false;
 		
-		{
-			bool hasVersionHeader = false;
-			
-			for(auto &p : headers.equal_range_ex("sec-websocket-version")){
-				if(hasVersionHeader) return MalformedRequest();
-				hasVersionHeader = true;
-				
-				if(!detail::equalsi(p.second, "13")) sendMyVersion = true;
-			}
-			
-			if(!hasVersionHeader) return MalformedRequest();
+		if(headers.m_hSecWebSocketVersion == nullptr) return MalformedRequest();
+		if(!detail::equalsi(headers.m_hSecWebSocketVersion, "13")){
+			sendMyVersion = true;
 		}
 		
-		std::string securityKey;
+		if(headers.m_hSecWebSocketKey == nullptr) return MalformedRequest();
 		
-		{
-			bool hasSecurityKey = false;
-			
-			for(auto &p : headers.equal_range_ex("sec-websocket-key")){
-				if(hasSecurityKey) return MalformedRequest();
-				hasSecurityKey = true;
-				
-				securityKey = p.second;
-			}
-			
-			if(!hasSecurityKey) return MalformedRequest();
-		}
+		std::string securityKey = headers.m_hSecWebSocketKey;
 		
 		if(m_pServer->m_fnCheckConnection && !m_pServer->m_fnCheckConnection(req)){
 			Write("HTTP/1.1 403 Forbidden\r\n\r\n");

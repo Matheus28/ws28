@@ -7,41 +7,10 @@
 #include <algorithm>
 #include <map>
 
+#include "Headers.h"
 #include "TLS.h"
 
 namespace ws28 {
-	
-	namespace detail {
-		template<typename T>
-		struct pair_range {
-			pair_range(const std::pair<T, T> &p) : p(p){}
-			
-			T begin(){ return p.first; }
-			T end(){ return p.second; }
-			
-			std::pair<T, T> p;
-		};
-		
-		bool equalsi(const char *a, const char *b);
-		
-		struct multimap_compare {
-			inline bool operator()(const char *a, const char *b) const {
-				return std::lexicographical_compare(a, a + strlen(a), b, b + strlen(b));
-			}
-		};
-		
-		class multihash : public std::multimap<const char*, const char*, multimap_compare> {
-		public:
-			pair_range<iterator> equal_range_ex(const char *key){
-				return pair_range<iterator>(equal_range(key));
-			}
-			
-			pair_range<const_iterator> equal_range_ex(const char *key) const{
-				return pair_range<const_iterator>(equal_range(key));
-			}
-		};
-	}
-	
 	class Server;
 	class Client {
 		enum { MAX_MESSAGE_SIZE = 16 * 1024 };

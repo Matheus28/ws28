@@ -16,7 +16,7 @@ namespace ws28 {
 		const char *path;
 		
 		// Header keys are always lower case
-		const detail::multihash &headers;
+		const RequestHeaders &headers;
 	};
 	
 	class HTTPResponse {

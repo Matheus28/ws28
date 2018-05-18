@@ -12,22 +12,10 @@ Server::Server(int port, uv_loop_t *loop, bool ipv4Only, SSL_CTX *ctx) : m_pLoop
 #endif
 	
 	m_fnCheckConnection = [](HTTPRequest &req) -> bool {
-		const char *host = nullptr;
-		
-		for(auto &p : req.headers.equal_range_ex("host")){
-			if(host != nullptr) return false; // Multiple Host headers, better deny
-			host = p.second;
-		}
-		
+		const char *host = req.headers.m_hHost;
 		if(host == nullptr) return true; // No host header, default to accept
 		
-		const char *origin = nullptr;
-		
-		for(auto &p : req.headers.equal_range_ex("origin")){
-			if(origin != nullptr) return false; // Multiple Origin headers, better deny
-			origin = p.second;
-		}
-		
+		const char *origin = req.headers.m_hOrigin;
 		if(origin == nullptr) return true;
 		
 		return strcmp(origin, host) == 0;

@@ -25,9 +25,9 @@ int main(){
 		ss << "Hi, you issued a " << req.method << " to " << req.path << "\r\n";
 		ss << "Headers:\r\n";
 		
-		for(auto &p : req.headers){
-			ss << p.first << ": " << p.second << "\r\n";
-		}
+		req.headers.ForEach([&](const char *key, const char *value){
+			ss << key << ": " << value << "\r\n";
+		});
 		
 		res.send(ss.str());
 	});
