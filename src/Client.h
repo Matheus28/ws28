@@ -89,6 +89,8 @@ namespace ws28 {
 		
 		void Consume(size_t amount);
 		
+		void ClearServer(){ m_pServer = nullptr; }
+		
 		std::unique_ptr<char[]> ToUniqueBuffer(const char *buf, size_t len);
 		
 		

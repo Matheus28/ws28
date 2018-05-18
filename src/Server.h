@@ -55,7 +55,7 @@ namespace ws28 {
 		// Dettaches clients from this server
 		// You can call this before destroying this server to keep clients around after it's destroyed
 		// (default behavior is to destroy all clients when the server is destroyed)
-		void DettachClients(){ m_Clients.clear(); }
+		void DettachClients();
 		
 		// This callback is called when the client is trying to connect using websockets
 		// By default, for safety, this checks the Origin and makes sure it matches the Host

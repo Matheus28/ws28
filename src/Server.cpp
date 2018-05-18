@@ -78,10 +78,19 @@ void Server::NotifyClientDestroyed(Client *client, bool handshakeCompleted){
 	
 	for(auto it = m_Clients.begin(); it != m_Clients.end(); ++it){
 		if(*it == client){
+			client->ClearServer();
 			m_Clients.erase(it);
 			break;
 		}
 	}
+}
+
+void Server::DetachClients(){
+	for(auto &c : m_Clients){
+		c->ClearServer();
+	}
+	
+	m_Clients.clear();
 }
 
 }
