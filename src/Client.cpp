@@ -605,9 +605,8 @@ void Client::WriteRaw(std::unique_ptr<char[]> data, size_t len){
 	
 	int written = uv_try_write((uv_stream_t*) m_pSocket, &buf, 1);
 	if(written != UV_EAGAIN){
-		if(written == 0){
-			WriteRawQueue(std::move(data), len);
-		}else if(written > 0){
+		assert(written != 0);
+		if(written > 0){
 			if(written == len) return;
 			
 			// Partial write
