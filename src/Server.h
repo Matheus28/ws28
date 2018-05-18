@@ -82,6 +82,9 @@ namespace ws28 {
 		
 		SSL_CTX* GetSSLContext() const { return m_pSSLContext; }
 		
+		inline void SetUserData(void *v){ m_pUserData = v; }
+		inline void* GetUserData() const { return m_pUserData; }
+		
 	private:
 		void OnConnection(uv_stream_t* server, int status);
 		
@@ -98,6 +101,7 @@ namespace ws28 {
 		uv_loop_t *m_pLoop;
 		uv_tcp_t m_Server;
 		SSL_CTX *m_pSSLContext;
+		void *m_pUserData = nullptr;
 		std::vector<Client*> m_Clients;
 		
 		CheckConnectionFn m_fnCheckConnection = nullptr;
