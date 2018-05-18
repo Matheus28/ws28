@@ -672,7 +672,7 @@ void Client::Cork(bool v){
 	
 	// MacOS needs this to flush the messages out
 	if(!enable){
-		::send(fd, "", 0, MSG_NOSIGNAL);
+		::send(fd, "", 0, 0);
 	}
 #endif
 }
