@@ -528,6 +528,8 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 }
 
 void Client::Send(const char *data, size_t len, uint8_t opCode){
+	if(!m_pSocket) return;
+	
 	auto fdata = std::make_unique<char[]>(len + GetDataFrameHeaderSize(len));
 	
 	WriteDataFrameHeader(opCode, len, fdata.get());
