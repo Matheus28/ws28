@@ -160,8 +160,9 @@ size_t Client::GetDataFrameHeaderSize(size_t len){
 	}
 }
 
-void Client::OnRawSocketData(const char *data, size_t len){
+void Client::OnRawSocketData(char *data, size_t len){
 	if(len == 0) return;
+	if(!m_pSocket) return;
 	
 	if(m_bWaitingForFirstPacket){
 		m_bWaitingForFirstPacket = false;
@@ -174,7 +175,7 @@ void Client::OnRawSocketData(const char *data, size_t len){
 	}
 	
 	if(IsSecure()){
-		if(!m_pTLS->ReceivedData(data, len, [&](const char *data, size_t len){
+		if(!m_pTLS->ReceivedData(data, len, [&](char *data, size_t len){
 			OnSocketData(data, len);
 		})){
 			return Destroy();
@@ -186,28 +187,56 @@ void Client::OnRawSocketData(const char *data, size_t len){
 	}
 }
 
-void Client::OnSocketData(const char *data, size_t len){
+void Client::OnSocketData(char *data, size_t len){
 	// This gives us an extra byte just in case
 	if(m_iBufferPos + len + 1 >= sizeof(m_Buffer)){
 		Destroy(); // Buffer overflow
 		return;
 	}
 	
-	// Push data to buffer
-	memcpy(&m_Buffer[m_iBufferPos], data, len);
-	m_iBufferPos += len;
-	m_Buffer[m_iBufferPos] = 0;
+	// If we don't have anything stored in our class-level buffer (m_Buffer),
+	// we use the buffer we received in the function arguments so we don't have to
+	// perform any copying. The Bail function needs to be called before we leave this
+	// function (unless we're destroying the client), to copy the unused part of the buffer
+	// back to our class-level buffer
+	char *buffer;
+	size_t bufferLen;
+	bool usingLocalBuffer;
+	
+	if(m_iBufferPos == 0){
+		usingLocalBuffer = true;
+		buffer = data;
+		bufferLen = len;
+	}else{
+		usingLocalBuffer = false;
+		memcpy(&m_Buffer[m_iBufferPos], data, len);
+		m_iBufferPos += len;
+		m_Buffer[m_iBufferPos] = 0;
+		
+		buffer = m_Buffer;
+		bufferLen = m_iBufferPos;
+	}
+	
+	
+	
+	auto Bail = [&](){
+		// Copy partial HTTP headers to our buffer
+		if(usingLocalBuffer){
+			memcpy(m_Buffer, buffer, bufferLen);
+			m_iBufferPos = bufferLen;
+		}
+	};
 	
 	if(!m_bHasCompletedHandshake){
 		// HTTP headers not done yet, wait
-		if(strstr((char*)m_Buffer, "\r\n\r\n") == nullptr) return;
+		if(strstr((char*)buffer, "\r\n\r\n") == nullptr) return Bail();
 		
 		auto MalformedRequest = [&](){
 			Write("HTTP/1.1 400 Bad Request\r\n\r\n");
 			Destroy();
 		};
 		
-		char *str = (char*)m_Buffer;
+		char *str = buffer;
 		
 		const char *method;
 		const char *path;
@@ -384,21 +413,21 @@ void Client::OnSocketData(const char *data, size_t len){
 	
 	for(;;){
 		// Not enough to read the header
-		if(m_iBufferPos < 2) return;
+		if(bufferLen < 2) return Bail();
 		
-		DataFrameHeader header((char*) m_Buffer);
+		DataFrameHeader header(buffer);
 		
 		if(header.rsv1() || header.rsv2() || header.rsv3()) return Destroy();
 
-		char *curPosition = m_Buffer + 2;
+		char *curPosition = buffer + 2;
 
 		size_t frameLength = header.len();
 		if(frameLength == 126){
-			if(m_iBufferPos < 4) return;
+			if(bufferLen < 4) return Bail();
 			frameLength = (*(uint8_t*)(curPosition) << 8) | (*(uint8_t*)(curPosition + 1));
 			curPosition += 2;
 		}else if(frameLength == 127){
-			if(m_iBufferPos < 10) return;
+			if(bufferLen < 10) return Bail();
 
 			frameLength = ((uint64_t)*(uint8_t*)(curPosition) << 56) | ((uint64_t)*(uint8_t*)(curPosition + 1) << 48)
 				| ((uint64_t)*(uint8_t*)(curPosition + 2) << 40) | ((uint64_t)*(uint8_t*)(curPosition + 3) << 32)
@@ -408,16 +437,16 @@ void Client::OnSocketData(const char *data, size_t len){
 			curPosition += 8;
 		}
 
-		auto amountLeft = m_iBufferPos - (curPosition - m_Buffer);
+		auto amountLeft = bufferLen - (curPosition - buffer);
 		const char *maskKey = nullptr;
 		if(header.mask()){
-			if(amountLeft < 4) return;
+			if(amountLeft < 4) return Bail();
 			maskKey = curPosition;
 			curPosition += 4;
 			amountLeft -= 4;
 		}
 		
-		if(frameLength > amountLeft) return;
+		if(frameLength > amountLeft) return Bail();
 		
 		auto Unmask = [&](char *data, size_t len){
 			if(header.mask()){
@@ -486,13 +515,20 @@ void Client::OnSocketData(const char *data, size_t len){
 			
 		}
 
-		Consume((curPosition - m_Buffer) + frameLength);
+		size_t amount = (curPosition - buffer) + frameLength;
+		
+		if(usingLocalBuffer){
+			buffer += amount;
+			bufferLen -= amount;
+		}else{
+			memmove(m_Buffer, &m_Buffer[amount], m_iBufferPos - amount);
+			m_iBufferPos -= amount;
+			// buffer = m_Buffer
+			bufferLen = m_iBufferPos;
+		}
 	}
-}
-
-void Client::Consume(size_t amount){
-	memmove(m_Buffer, &m_Buffer[amount], m_iBufferPos - amount);
-	m_iBufferPos -= amount;
+	
+	// Unreachable
 }
 
 
