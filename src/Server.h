@@ -52,10 +52,10 @@ namespace ws28 {
 		Server(const Server &other) = delete;
 		~Server();
 		
-		// Dettaches clients from this server
+		// Detaches clients from this server
 		// You can call this before destroying this server to keep clients around after it's destroyed
 		// (default behavior is to destroy all clients when the server is destroyed)
-		void DettachClients();
+		void DetachClients();
 		
 		// This callback is called when the client is trying to connect using websockets
 		// By default, for safety, this checks the Origin and makes sure it matches the Host
