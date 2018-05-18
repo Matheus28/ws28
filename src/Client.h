@@ -61,6 +61,8 @@ namespace ws28 {
 		
 		void ClearServer(){ m_pServer = nullptr; }
 		
+		void Cork(bool v);
+		
 		std::unique_ptr<char[]> ToUniqueBuffer(const char *buf, size_t len);
 		
 		

@@ -373,6 +373,14 @@ void Client::OnSocketData(const char *data, size_t len){
 		return;
 	}
 	
+	struct Corker {
+		Client &client;
+		
+		Corker(Client &client) : client(client) { client.Cork(true); }
+		~Corker(){ client.Cork(false); }
+	};
+	
+	Corker corker{*this};
 	
 	for(;;){
 		// Not enough to read the header
@@ -607,6 +615,22 @@ void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
 		delete request;
 		Destroy();
 	}
+}
+
+void Client::Cork(bool v){
+	if(!m_pSocket) return;
+	
+	int enable = v;
+	uv_os_fd_t fd;
+	uv_fileno((uv_handle_t*) m_pSocket, &fd);
+	
+#if defined(TCP_CORK)
+	// Linux & SmartOS have proper TCP_CORK
+	setsockopt(fd, IPPROTO_TCP, TCP_CORK, &enable, sizeof(int));
+#elif defined(TCP_NOPUSH)
+	// Mac OS X & FreeBSD have TCP_NOPUSH
+	setsockopt(fd, IPPROTO_TCP, TCP_NOPUSH, &enable, sizeof(int));
+#endif
 }
 
 
