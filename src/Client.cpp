@@ -607,7 +607,7 @@ void Client::WriteRaw(std::unique_ptr<char[]> data, size_t len){
 	if(written != UV_EAGAIN){
 		assert(written != 0);
 		if(written > 0){
-			if(written == len) return;
+			if(written == len) return; // <= This should be the common case
 			
 			// Partial write
 			
