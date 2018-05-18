@@ -19,7 +19,7 @@ namespace ws28 {
 			T begin(){ return p.first; }
 			T end(){ return p.second; }
 			
-			const std::pair<T, T> &p;
+			std::pair<T, T> p;
 		};
 		
 		bool equalsi(const char *a, const char *b);
