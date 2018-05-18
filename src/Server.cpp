@@ -28,12 +28,22 @@ Server::Server(int port, uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLC
 	m_Server.data = this;
 	
 	uv_tcp_init(uv_default_loop(), &m_Server);
-	struct sockaddr_in addr;
-	uv_ip4_addr("0.0.0.0", port, &addr);
+	struct sockaddr *addr;
+	struct sockaddr_in addr4;
+	struct sockaddr_in6 addr6;
+	
+	if(ipv4Only){
+		uv_ip4_addr("0.0.0.0", port, &addr4);
+		addr = (struct sockaddr*) &addr4;
+	}else{
+		uv_ip6_addr("::0", port, &addr6);
+		addr = (struct sockaddr*) &addr6;
+	}
+	
 	uv_tcp_nodelay(&m_Server, (int) true);
 	
-	if(uv_tcp_bind(&m_Server, (const struct sockaddr*) &addr, 0) != 0){
-		puts("ws28: Couldn't bind");
+	if(uv_tcp_bind(&m_Server, addr, 0) != 0){
+		fprintf(stderr, "ws28: Couldn't bind\n");
 		uv_close((uv_handle_t*) &m_Server, nullptr);
 		abort();
 	}
@@ -41,7 +51,7 @@ Server::Server(int port, uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLC
 	if(uv_listen((uv_stream_t*) &m_Server, 256, [](uv_stream_t* server, int status){
 		((Server*) server->data)->OnConnection(server, status);
 	}) != 0){
-		puts("ws28: Couldn't start listening");
+		fprintf(stderr, "ws28: Couldn't start listening\n");
 		uv_close((uv_handle_t*) &m_Server, nullptr);
 		abort();
 	}

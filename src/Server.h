@@ -47,10 +47,12 @@ namespace ws28 {
 		typedef void (*HTTPRequestFn)(HTTPRequest&, HTTPResponse&);
 	public:
 		
+		// Note: By default, this listens on both ipv4 and ipv6
 		// Note: if you provide a SSL_CTX, this server will listen to *BOTH* secure and insecure connections at that port,
 		//       sniffing the first byte to figure out whether it's secure or not
-		Server(int port, uv_loop_t *loop, SSL_CTX *ctx = nullptr);
+		Server(int port, uv_loop_t *loop, bool ipv4Only = false, SSL_CTX *ctx = nullptr);
 		Server(const Server &other) = delete;
+		Server& operator=(const Server &other) = delete;
 		~Server();
 		
 		// Detaches clients from this server
