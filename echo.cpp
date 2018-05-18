@@ -8,15 +8,16 @@ int main(){
 	
 	s.SetClientConnectedCallback([](ws28::Client *client){
 		client->SetUserData((void*) ++userID);
-		printf("Client %d connected\n", (int) userID);
+		//printf("Client %d connected\n", (int) userID);
 	});
 	
 	s.SetClientDisconnectedCallback([](ws28::Client *client){
-		printf("Client %d disconnected\n", (int) (intptr_t) client->GetUserData());
+		//printf("Client %d disconnected\n", (int) (intptr_t) client->GetUserData());
 	});
 	
 	s.SetClientDataCallback([](ws28::Client *client, const char *data, size_t len){
-		printf("Client %d: %.*s\n", (int) (intptr_t) client->GetUserData(), (int) len, data);
+		//printf("Client %d: %.*s\n", (int) (intptr_t) client->GetUserData(), (int) len, data);
+		client->Send(data, len);
 	});
 	
 	s.SetHTTPCallback([](ws28::HTTPRequest &req, ws28::HTTPResponse &res){
