@@ -40,7 +40,7 @@ Server::Server(int port, uv_loop_t *loop, bool ipv4Only, SSL_CTX *ctx) : m_pLoop
 		abort();
 	}
 	
-	if(uv_listen((uv_stream_t*) &m_Server, 256, [](uv_stream_t* server, int status){
+	if(uv_listen((uv_stream_t*) &m_Server, 512, [](uv_stream_t* server, int status){
 		((Server*) server->data)->OnConnection(server, status);
 	}) != 0){
 		fprintf(stderr, "ws28: Couldn't start listening\n");
