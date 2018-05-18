@@ -2,7 +2,7 @@
 
 namespace ws28{
 
-Server::Server(int port, uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx){
+Server::Server(int port, uv_loop_t *loop, bool ipv4Only, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx){
 	m_fnCheckConnection = [](HTTPRequest &req) -> bool {
 		const char *host = nullptr;
 		
