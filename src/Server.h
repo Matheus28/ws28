@@ -2,7 +2,6 @@
 #define H_2ABA91710E664A51814F459521E1C4D4
 
 #include <memory>
-#include <string_view>
 #include <map>
 #include <string>
 
@@ -12,23 +11,24 @@ namespace ws28 {
 	class Server;
 	
 	struct HTTPRequest {
-		std::string_view method;
-		std::string_view path;
+		const char *method;
+		const char *path;
 		
 		// Header keys are always lower case
-		const std::multimap<std::string_view, std::string_view> &headers;
+		const detail::multihash &headers;
 	};
 	
 	class HTTPResponse {
 	public:
 		
 		HTTPResponse& status(int v){ statusCode = v; return *this; }
-		HTTPResponse& send(std::string_view v){ if(statusCode == 0) statusCode = 200; body.append(v); return *this; }
+		HTTPResponse& send(const char *v){ if(statusCode == 0) statusCode = 200; body.append(v); return *this; }
+		HTTPResponse& send(const std::string &v){ return send(v.c_str()); }
 		
 		// Appends a response header. The following headers cannot be changed:
 		// Connection: close
 		// Content-Length: body.size()
-		HTTPResponse& header(std::string_view key, std::string_view value){ headers.emplace(key, value); return *this; }
+		HTTPResponse& header(const std::string &key, const std::string &value){ headers.emplace(key, value); return *this; }
 		
 	private:
 		int statusCode = 0;
@@ -39,7 +39,7 @@ namespace ws28 {
 	};
 	
 	class Server {
-		typedef bool (*CheckConnectionFn)(Client *, std::string_view path, const std::multimap<std::string_view, std::string_view> &headers);
+		typedef bool (*CheckConnectionFn)(HTTPRequest&);
 		typedef void (*ClientConnectedFn)(Client *);
 		typedef void (*ClientDisconnectedFn)(Client *);
 		typedef void (*ClientDataFn)(Client *, const char *, size_t);

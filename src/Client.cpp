@@ -4,17 +4,19 @@
 #include "base64.h"
 #include <string>
 #include <sstream>
+#include <cassert>
 
 namespace ws28 {
 	
 namespace detail {
-	bool equalsi(std::string_view a, std::string_view b){
-		if(a.size() != b.size()) return false;
-		for(size_t i = 0; i < a.size(); ++i){
-			if(tolower(a[i]) != tolower(b[i])) return false;
+	bool equalsi(const char *a, const char *b){
+		for(;;){
+			if(tolower(*a) != tolower(*b)) return false;
+			if(!*a) return true;
+			
+			++a;
+			++b;
 		}
-		
-		return true;
 	}
 }
 
@@ -207,30 +209,33 @@ void Client::OnSocketData(const char *data, size_t len){
 		
 		char *str = (char*)m_Buffer;
 		
-		std::string_view method;
-		std::string_view path;
+		const char *method;
+		const char *path;
 		
 		{
 			auto methodEnd = strstr(str, " ");
-			method = { str, (size_t)(methodEnd - str) };
 			
 			auto endOfLine = strstr(str, "\r\n");
 			assert(endOfLine != nullptr); // Can't fail because of a check above
 			
 			if(methodEnd == nullptr || methodEnd > endOfLine) return MalformedRequest();
 			
+			method = str;
+			*methodEnd = '\0';
+			
 			auto pathStart = methodEnd + 1;
 			auto pathEnd = strstr(pathStart, " ");
 			
 			if(pathEnd == nullptr || pathEnd > endOfLine) return MalformedRequest();
 			
-			path = { pathStart, (size_t)(pathEnd - pathStart) };
+			path = pathStart;
+			*pathEnd = '\0';
 			
 			// Skip line
 			str = endOfLine + 2;
 		}
 		
-		std::multimap<std::string_view, std::string_view> headers;
+		detail::multihash headers;
 		
 		for(;;) {
 			auto nextLine = strstr(str, "\r\n");
@@ -251,42 +256,42 @@ void Client::OnSocketData(const char *data, size_t len){
 			// Key to lower case
 			std::transform(keyStart, keyEnd, keyStart, ::tolower);
 			
-			std::string_view key{keyStart, size_t(keyEnd - keyStart)};
 			
-			auto valuePos = colonPos + 1;
-			std::string_view value{valuePos, size_t(nextLine - valuePos)};
+			auto valueStart = colonPos + 1;
+			auto valueEnd = nextLine;
 			
 			
 			// Trim spaces
-			while(!key.empty() && key.front() == ' ') key.remove_prefix(1);
-			while(!key.empty() && key.back() == ' ') key.remove_suffix(1);
-			while(!value.empty() && value.front() == ' ') value.remove_prefix(1);
-			while(!value.empty() && value.back() == ' ') value.remove_suffix(1);
+			while(keyStart != keyEnd && *keyStart == ' ') ++keyStart;
+			while(keyStart != keyEnd && *(keyEnd - 1) == ' ') --keyEnd;
+			while(valueStart != valueEnd && *valueStart == ' ') ++valueStart;
+			while(valueStart != valueEnd && *(valueEnd - 1) == ' ') --valueEnd;
 			
+			*keyEnd = '\0';
+			*valueEnd = '\0';
 			
-			headers.insert({ key, value });
+			headers.insert({ keyStart, valueStart });
 			
 			str = nextLine + 2;
 		}
 		
-#define EXPAND_LITERAL(x) x, strlen(x)
+		HTTPRequest req{
+			method,
+			path,
+			headers,
+		};
 		
 		{
 			bool hasUpgradeHeader = false;
 			
-			for(auto &[key, value] : detail::pair_range(headers.equal_range("upgrade"))){
+			for(auto &p : headers.equal_range_ex("upgrade")){
 				if(hasUpgradeHeader)  return MalformedRequest();
 				hasUpgradeHeader = true;
 				
-				if(!detail::equalsi(value, "websocket")) return MalformedRequest();
+				if(!detail::equalsi(p.second, "websocket")) return MalformedRequest();
 			}
 			
 			if(!hasUpgradeHeader){
-				HTTPRequest req{
-					method,
-					path,
-					headers,
-				};
 				
 				HTTPResponse res;
 				
@@ -303,8 +308,8 @@ void Client::OnSocketData(const char *data, size_t len){
 				ss << "Connection: close\r\n";
 				ss << "Content-Length: " << res.body.size() << "\r\n";
 				
-				for(auto &[key, value] : res.headers){
-					ss << key << ": " << value << "\r\n";
+				for(auto &p : res.headers){
+					ss << p.first << ": " << p.second << "\r\n";
 				}
 				
 				ss << "\r\n";
@@ -322,11 +327,11 @@ void Client::OnSocketData(const char *data, size_t len){
 		{
 			bool hasConnectionHeader = false;
 			
-			for(auto &[key, value] : detail::pair_range(headers.equal_range("connection"))){
+			for(auto &p : headers.equal_range_ex("connection")){
 				if(hasConnectionHeader) return MalformedRequest();
 				hasConnectionHeader = true;
 				
-				if(!detail::equalsi(value, "upgrade")) return MalformedRequest();
+				if(!detail::equalsi(p.second, "upgrade")) return MalformedRequest();
 			}
 			
 			if(!hasConnectionHeader) return MalformedRequest();
@@ -337,11 +342,11 @@ void Client::OnSocketData(const char *data, size_t len){
 		{
 			bool hasVersionHeader = false;
 			
-			for(auto &[key, value] : detail::pair_range(headers.equal_range("sec-websocket-version"))){
+			for(auto &p : headers.equal_range_ex("sec-websocket-version")){
 				if(hasVersionHeader) return MalformedRequest();
 				hasVersionHeader = true;
 				
-				if(!detail::equalsi(value, "13")) sendMyVersion = true;
+				if(!detail::equalsi(p.second, "13")) sendMyVersion = true;
 			}
 			
 			if(!hasVersionHeader) return MalformedRequest();
@@ -352,17 +357,17 @@ void Client::OnSocketData(const char *data, size_t len){
 		{
 			bool hasSecurityKey = false;
 			
-			for(auto &[key, value] : detail::pair_range(headers.equal_range("sec-websocket-key"))){
+			for(auto &p : headers.equal_range_ex("sec-websocket-key")){
 				if(hasSecurityKey) return MalformedRequest();
 				hasSecurityKey = true;
 				
-				securityKey = value;
+				securityKey = p.second;
 			}
 			
 			if(!hasSecurityKey) return MalformedRequest();
 		}
 		
-		if(m_pServer->m_fnCheckConnection && !m_pServer->m_fnCheckConnection(this, path, headers)){
+		if(m_pServer->m_fnCheckConnection && !m_pServer->m_fnCheckConnection(req)){
 			Write("HTTP/1.1 403 Forbidden\r\n\r\n");
 			Destroy();
 			return;
@@ -386,7 +391,7 @@ void Client::OnSocketData(const char *data, size_t len){
 			solvedHash.c_str()
 		);
 		
-		assert(bufLen >= 0 && bufLen < sizeof(buf));
+		assert(bufLen >= 0 && (size_t) bufLen < sizeof(buf));
 		
 		Write(ToUniqueBuffer(buf, bufLen), bufLen);
 		

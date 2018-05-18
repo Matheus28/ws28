@@ -3,26 +3,26 @@
 namespace ws28{
 
 Server::Server(int port, uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx){
-	m_fnCheckConnection = [](Client *, std::string_view path, const std::multimap<std::string_view, std::string_view> &headers) -> bool {
-		std::string_view host;
+	m_fnCheckConnection = [](HTTPRequest &req) -> bool {
+		const char *host = nullptr;
 		
-		for(auto &[key, value] : detail::pair_range(headers.equal_range("host"))){
-			if(host.data() != nullptr) return false; // Multiple Host headers, better deny
-			host = value;
+		for(auto &p : req.headers.equal_range_ex("host")){
+			if(host != nullptr) return false; // Multiple Host headers, better deny
+			host = p.second;
 		}
 		
-		if(host.data() == nullptr) return true; // No host header, default to accept
+		if(host == nullptr) return true; // No host header, default to accept
 		
-		std::string_view origin;
+		const char *origin = nullptr;
 		
-		for(auto &[key, value] : detail::pair_range(headers.equal_range("origin"))){
-			if(origin.data() != nullptr) return false; // Multiple Origin headers, better deny
-			origin = value;
+		for(auto &p : req.headers.equal_range_ex("origin")){
+			if(origin != nullptr) return false; // Multiple Origin headers, better deny
+			origin = p.second;
 		}
 		
-		if(origin.data() == nullptr) return true;
+		if(origin == nullptr) return true;
 		
-		return origin == host;
+		return strcmp(origin, host) == 0;
 	};
 	
 	m_Server.data = this;

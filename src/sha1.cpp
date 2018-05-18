@@ -34,8 +34,8 @@
 
 #include "sha1.h"
 
-namespace ws28::sha1
-{
+namespace ws28 {
+namespace sha1 {
     namespace // local
     {
         // Rotate an integer value to left.
@@ -181,4 +181,5 @@ namespace ws28::sha1
         }
         hexstring[40] = 0;
     }
-} // namespace sha1
+}
+}

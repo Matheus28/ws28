@@ -1,6 +1,6 @@
 
 env = Environment(
-	CXXFLAGS = ['-std=c++17', '-Wall'],
+	CXXFLAGS = ['-std=c++14', '-Wall'],
 	LIBS = ['ssl', 'crypto', 'uv']
 )
 

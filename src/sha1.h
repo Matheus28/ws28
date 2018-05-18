@@ -28,7 +28,8 @@
 #ifndef H_E5DF21C793834A82B00BDD7FCD214FCC
 #define H_E5DF21C793834A82B00BDD7FCD214FCC
 
-namespace ws28::sha1 {
+namespace ws28 {
+namespace sha1 {
 
     /**
      @param src points to any kind of data to be hashed.
@@ -43,6 +44,7 @@ namespace ws28::sha1 {
      */
     void toHexString(const unsigned char* hash, char* hexstring);
 
+}
 }
 
 #endif

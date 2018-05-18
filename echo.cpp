@@ -24,8 +24,8 @@ int main(){
 		ss << "Hi, you issued a " << req.method << " to " << req.path << "\r\n";
 		ss << "Headers:\r\n";
 		
-		for(auto &[key, value] : req.headers){
-			ss << key << ": " << value << "\r\n";
+		for(auto &p : req.headers){
+			ss << p.first << ": " << p.second << "\r\n";
 		}
 		
 		res.send(ss.str());
