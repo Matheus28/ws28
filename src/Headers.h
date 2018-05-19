@@ -50,6 +50,7 @@ namespace ws28 {
 			X("user-agent", m_hUserAgent) \
 			X("sec-websocket-key", m_hSecWebSocketKey) \
 			X("sec-websocket-version", m_hSecWebSocketVersion) \
+			X("sec-websocket-extensions", m_hSecWebSocketExtensions) \
 			
 		void Set(const char *key, const char *value){
 			#define X(str, variable) if(strcmp(key, str) == 0){ variable = value; return; }
