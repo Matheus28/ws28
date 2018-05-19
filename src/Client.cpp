@@ -189,7 +189,7 @@ void Client::OnRawSocketData(char *data, size_t len){
 
 void Client::OnSocketData(char *data, size_t len){
 	// This gives us an extra byte just in case
-	if(m_iBufferPos + len + 1 >= sizeof(m_Buffer)){
+	if(m_iBufferPos + len + 1 >= MAX_MESSAGE_SIZE){
 		Destroy(); // Buffer overflow
 		return;
 	}
@@ -204,16 +204,18 @@ void Client::OnSocketData(char *data, size_t len){
 	bool usingLocalBuffer;
 	
 	if(m_iBufferPos == 0){
+		assert(!m_Buffer);
 		usingLocalBuffer = true;
 		buffer = data;
 		bufferLen = len;
 	}else{
 		usingLocalBuffer = false;
-		memcpy(&m_Buffer[m_iBufferPos], data, len);
-		m_iBufferPos += len;
-		m_Buffer[m_iBufferPos] = 0;
 		
-		buffer = m_Buffer;
+		buffer = m_Buffer.get();
+		
+		memcpy(buffer + m_iBufferPos, data, len);
+		m_iBufferPos += len;
+		buffer[m_iBufferPos] = 0;
 		bufferLen = m_iBufferPos;
 	}
 	
@@ -221,9 +223,10 @@ void Client::OnSocketData(char *data, size_t len){
 	
 	auto Bail = [&](){
 		// Copy partial HTTP headers to our buffer
-		if(usingLocalBuffer){
+		if(usingLocalBuffer && bufferLen > 0){
 			assert(m_iBufferPos == 0);
-			memcpy(m_Buffer, buffer, bufferLen);
+			m_Buffer = std::make_unique<char[]>(MAX_MESSAGE_SIZE);
+			memcpy(m_Buffer.get(), buffer, bufferLen);
 			m_iBufferPos = bufferLen;
 		}
 	};
@@ -522,10 +525,16 @@ void Client::OnSocketData(char *data, size_t len){
 				buffer += amount;
 				bufferLen -= amount;
 			}else{
-				memmove(m_Buffer, &m_Buffer[amount], m_iBufferPos - amount);
+				memmove(m_Buffer.get(), m_Buffer.get() + amount, m_iBufferPos - amount);
 				m_iBufferPos -= amount;
-				// buffer = m_Buffer
+				// buffer = m_Buffer.get()
 				bufferLen = m_iBufferPos;
+				
+				// Used up our class buffer, free it and make sure we crash if we try to use it further in this function
+				if(bufferLen == 0){
+					buffer = nullptr;
+					m_Buffer.reset();
+				}
 			}
 		}
 	}

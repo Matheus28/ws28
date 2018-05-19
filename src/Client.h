@@ -74,7 +74,7 @@ namespace ws28 {
 		std::vector<DataFrame> m_Frames;
 		
 		size_t m_iBufferPos = 0;
-		char m_Buffer[MAX_MESSAGE_SIZE];
+		std::unique_ptr<char[]> m_Buffer;
 		
 		friend class Server;
 		
