@@ -40,3 +40,14 @@ server.Listen(port);
 ## What's the license?
 
 Most files are MIT. The base64 and sha1 code are BSD, feel free to pull request some MIT licensed code to replace those.
+
+
+## More FAQ
+
+### Can I store pointers to `ws28::Client`?
+
+Only between the ClientConnected and ClientDisconnected callbacks. The client will be deleted at the next event loop iteration after ClientDisconnected, or later.
+
+### When is ClientDisconnected called?
+
+As soon as you call Destroy on a connected client. Just make sure to clean up everything there, the client object will still be valid for at least this event loop iteration. Any writes you try to make to the client will be safely ignored.
