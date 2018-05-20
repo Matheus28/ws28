@@ -267,6 +267,9 @@ void Client::OnSocketData(char *data, size_t len){
 			method = str;
 			*methodEnd = '\0';
 			
+			// Uppercase method
+			std::transform(str, methodEnd, str, ::toupper);
+			
 			auto pathStart = methodEnd + 1;
 			auto pathEnd = strstr(pathStart, " ");
 			
@@ -363,6 +366,9 @@ void Client::OnSocketData(char *data, size_t len){
 				return;
 			}
 		}
+		
+		// WebSocket upgrades must be GET
+		if(strcmp(method, "GET") != 0) return MalformedRequest();
 		
 		if(headers.m_hConnection == nullptr) return MalformedRequest();
 		if(!detail::equalsi(headers.m_hConnection, "upgrade")) return MalformedRequest();
