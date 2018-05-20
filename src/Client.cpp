@@ -426,6 +426,8 @@ void Client::OnSocketData(char *data, size_t len){
 	detail::Corker corker{*this};
 	
 	for(;;){
+		if(!m_Socket) return; // No need to destroy even
+		
 		// Not enough to read the header
 		if(bufferLen < 2) return Bail();
 		
