@@ -583,12 +583,16 @@ void Client::Send(const char *data, size_t len, uint8_t opCode){
 	
 	detail::Corker corker{*this};
 	
-	char header[16];
-	WriteDataFrameHeader(opCode, len, header);
-	Write(header, GetDataFrameHeaderSize(len));
+	SendDataFrameHeader(len, opCode);
 	Write(data, len);
 }
 
+void Client::SendDataFrameHeader(size_t payloadLen, uint8_t opCode){
+	if(!m_Socket) return;
+	char header[16];
+	WriteDataFrameHeader(opCode, payloadLen, header);
+	Write(header, GetDataFrameHeaderSize(payloadLen));
+}
 
 void Client::InitSecure(){
 	m_pTLS = std::make_unique<TLS>(m_pServer->GetSSLContext());

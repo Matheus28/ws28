@@ -72,6 +72,8 @@ namespace ws28 {
 		void Cork(bool v);
 		void ForceCork(bool v);
 		
+		void SendDataFrameHeader(size_t payloadLen, uint8_t opCode);
+		
 		std::unique_ptr<char[]> ToUniqueBuffer(const char *buf, size_t len);
 		
 		
