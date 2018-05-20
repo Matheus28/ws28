@@ -57,6 +57,7 @@ namespace ws28 {
 		
 		bool Listen(int port, bool ipv4Only = false);
 		void StopListening();
+		void DestroyClients();
 		
 		// This callback is called when the client is trying to connect using websockets
 		// By default, for safety, this checks the Origin and makes sure it matches the Host
@@ -93,7 +94,7 @@ namespace ws28 {
 			if(m_fnClientConnected) m_fnClientConnected(client);
 		}
 		
-		void NotifyClientDestroyed(Client *client, bool handshakeCompleted);
+		std::unique_ptr<Client> NotifyClientDestroyed(Client *client, bool handshakeCompleted);
 		
 		void NotifyClientData(Client *client, const char *data, size_t len){
 			if(m_fnClientData) m_fnClientData(client, data, len);
@@ -103,7 +104,7 @@ namespace ws28 {
 		SocketHandle m_Server;
 		SSL_CTX *m_pSSLContext;
 		void *m_pUserData = nullptr;
-		std::vector<Client*> m_Clients;
+		std::vector<std::unique_ptr<Client>> m_Clients;
 		
 		CheckConnectionFn m_fnCheckConnection = nullptr;
 		ClientConnectedFn m_fnClientConnected = nullptr;

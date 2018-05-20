@@ -88,7 +88,7 @@ namespace ws28 {
 		std::unique_ptr<char[]> m_Buffer;
 		
 		friend class Server;
-		
+		friend class std::unique_ptr<Client>;
 	};
 	
 }

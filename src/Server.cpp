@@ -64,14 +64,16 @@ void Server::StopListening(){
 	m_Server.reset();
 }
 
+void Server::DestroyClients(){
+	// Clients will erase themselves from this vector
+	while(!m_Clients.empty()){
+		m_Clients.back()->Destroy();
+	}
+}
+
 Server::~Server(){
 	StopListening();
-	
-	std::vector<Client*> clients;
-	std::swap(clients, m_Clients);
-	for(Client *c : clients){
-		c->Destroy();
-	}
+	DestroyClients();
 }
 
 void Server::OnConnection(uv_stream_t* server, int status){
@@ -83,21 +85,25 @@ void Server::OnConnection(uv_stream_t* server, int status){
 	socket->data = nullptr;
 
 	if(uv_accept(server, (uv_stream_t*) socket.get()) == 0){
-		m_Clients.push_back(new Client(this, std::move(socket)));
+		m_Clients.emplace_back(new Client(this, std::move(socket)));
 	}
 }
 
-void Server::NotifyClientDestroyed(Client *client, bool handshakeCompleted){
+std::unique_ptr<Client> Server::NotifyClientDestroyed(Client *client, bool handshakeCompleted){
 	if(m_fnClientDisconnected && handshakeCompleted){
 		m_fnClientDisconnected(client);
 	}
 	
 	for(auto it = m_Clients.begin(); it != m_Clients.end(); ++it){
-		if(*it == client){
+		if(it->get() == client){
+			std::unique_ptr<Client> r = std::move(*it);
 			m_Clients.erase(it);
-			break;
+			return r;
 		}
 	}
+	
+	assert(false);
+	return {};
 }
 
 }
