@@ -11,7 +11,7 @@ Maybe.
 
 ## Is it spec compliant?
 
-Mostly. It doesn't do the closing handshake properly (it simply kills the connection). Everything else should be spec compliant.
+Mostly. It doesn't do the closing handshake properly (it simply kills the connection). Text messages are handled exactly as binary ones and handed directly to the application, this means no UTF-8 validation. Everything else should be spec compliant.
 
 ## How do I use this?
 
