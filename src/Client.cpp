@@ -482,11 +482,12 @@ void Client::OnSocketData(char *data, size_t len){
 			}
 		};
 		
-		// Op codes can also never be fragmented
 		if(header.opcode() >= 0x08){
-			if(!header.fin()){
-				return Destroy();
-			}
+			// Op codes can also never be fragmented
+			if(!header.fin()) return Destroy();
+			// Control frames can only have up to 125 octets
+			if(frameLength > 125) return Destroy();
+			
 			
 			Unmask((char*) curPosition, frameLength);
 			ProcessDataFrame(header.opcode(), curPosition, frameLength);
