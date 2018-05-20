@@ -66,8 +66,10 @@ void Server::StopListening(){
 Server::~Server(){
 	StopListening();
 	
-	while(!m_Clients.empty()){
-		m_Clients.back()->Destroy(); // This will remove the client from the vector
+	std::vector<Client*> clients;
+	std::swap(clients, m_Clients);
+	for(Client *c : clients){
+		c->Destroy();
 	}
 }
 
