@@ -74,8 +74,7 @@ Client::Client(Server *server, SocketHandle socket) : m_pServer(server), m_Socke
 	}, [](uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf){
 		auto client = (Client*) stream->data;
 		
-		// Both checks are needed because when we're destroying, only the second one is false
-		if(client != nullptr && client->m_Socket){
+		if(client != nullptr){
 			if(nread < 0){
 				client->Destroy();
 			}else if(nread > 0){
@@ -93,6 +92,8 @@ Client::~Client(){
 
 void Client::Destroy(){
 	if(!m_Socket) return;
+	
+	m_Socket->data = nullptr;
 	
 	// Remove socket from our object, we'll put it in the shutdown request soon
 	SocketHandle tmp = std::move(m_Socket);
