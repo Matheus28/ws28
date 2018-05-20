@@ -618,7 +618,9 @@ void Client::WriteRaw(const char* data, size_t len){
 	buf.len = len;
 	
 	int written = uv_try_write((uv_stream_t*) m_Socket.get(), &buf, 1);
-	if(written != UV_EAGAIN){
+	if(written == UV_EAGAIN){
+		WriteRawQueue(ToUniqueBuffer(data, len), len);
+	}else{
 		assert(written != 0);
 		if(written > 0){
 			if((size_t) written == len) return; // <= This should be the common case
@@ -635,8 +637,6 @@ void Client::WriteRaw(const char* data, size_t len){
 			Destroy();
 			return;
 		}
-	}else{
-		WriteRawQueue(ToUniqueBuffer(data, len), len);
 	}
 }
 
