@@ -18,6 +18,8 @@ Server::Server(uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx
 		return strcmp(origin, host) == 0;
 	};
 	
+	// m_Server.data = nullptr means we're not listening
+	// m_Server.data = this means we are
 	m_Server.data = nullptr;
 }
 
