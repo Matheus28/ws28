@@ -496,7 +496,9 @@ void Client::OnSocketData(char *data, size_t len){
 			Unmask((char*) curPosition, frameLength);
 			ProcessDataFrame(header.opcode(), curPosition, frameLength);
 		}else{
-			if(!m_Frames.empty()){
+			if(m_Frames.empty()){
+				if(header.opcode() == 0) return Destroy();
+			}else{
 				if(header.opcode() != 0){
 					return Destroy(); // Must be continuation frame op code
 				}
@@ -562,12 +564,17 @@ void Client::OnSocketData(char *data, size_t len){
 void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 	if(opcode == 9){
 		// Ping
-		Send(data, len, 10); // Pong
+		Send(data, len, 10); // Send Pong
+	}else if(opcode == 10){
+		// Pong
 	}else if(opcode == 8){
 		// Close
 		Destroy();
 	}else if(opcode == 1 || opcode == 2){
 		m_pServer->NotifyClientData(this, data, len, opcode);
+	}else{
+		// Unknown
+		Destroy();
 	}
 }
 
