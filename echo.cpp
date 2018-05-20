@@ -48,10 +48,9 @@ int main(){
 	idler.data = &s;
 	uv_idle_start(&idler, [](uv_idle_t *idler){
 		if(quit){
-			puts("Quitting gracefully...");
+			puts("Waiting for clients to disconnect, send another SIGINT to force quit");
 			auto &s = *(ws28::Server*)(idler->data);
 			s.StopListening();
-			s.DestroyClients();
 			uv_idle_stop(idler);
 		}
 	});
