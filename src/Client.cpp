@@ -97,6 +97,7 @@ void Client::Destroy(){
 	m_pSocket = nullptr;
 	
 	m_pServer->NotifyClientDestroyed(this, m_bHasCompletedHandshake);
+	m_pServer = nullptr;
 	
 	auto req = new uv_shutdown_t;
 	req->data = socket;

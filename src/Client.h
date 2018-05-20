@@ -57,8 +57,6 @@ namespace ws28 {
 		void WriteRaw(std::unique_ptr<char[]> data, size_t len);
 		void WriteRawQueue(std::unique_ptr<char[]> data, size_t len);
 		
-		void ClearServer(){ m_pServer = nullptr; }
-		
 		void Cork(bool v);
 		
 		std::unique_ptr<char[]> ToUniqueBuffer(const char *buf, size_t len);

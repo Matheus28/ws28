@@ -6,11 +6,8 @@
 
 namespace ws28{
 
-Server::Server(int port, uv_loop_t *loop, bool ipv4Only, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx){
-#ifndef _WIN32
-	signal(SIGPIPE, SIG_IGN);
-#endif
-	
+Server::Server(uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx){
+
 	m_fnCheckConnection = [](HTTPRequest &req) -> bool {
 		const char *host = req.headers.m_hHost;
 		if(host == nullptr) return true; // No host header, default to accept
@@ -21,9 +18,17 @@ Server::Server(int port, uv_loop_t *loop, bool ipv4Only, SSL_CTX *ctx) : m_pLoop
 		return strcmp(origin, host) == 0;
 	};
 	
-	m_Server.data = this;
+	m_Server.data = nullptr;
+}
+
+bool Server::Listen(int port, bool ipv4Only){
+	if(m_Server.data != nullptr) return false;
 	
-	uv_tcp_init(uv_default_loop(), &m_Server);
+#ifndef _WIN32
+	signal(SIGPIPE, SIG_IGN);
+#endif
+	
+	uv_tcp_init(m_pLoop, &m_Server);
 	struct sockaddr_storage addr;
 	
 	if(ipv4Only){
@@ -37,24 +42,32 @@ Server::Server(int port, uv_loop_t *loop, bool ipv4Only, SSL_CTX *ctx) : m_pLoop
 	if(uv_tcp_bind(&m_Server, (struct sockaddr*) &addr, 0) != 0){
 		fprintf(stderr, "ws28: Couldn't bind\n");
 		uv_close((uv_handle_t*) &m_Server, nullptr);
-		abort();
+		return false;
 	}
 	
 	if(uv_listen((uv_stream_t*) &m_Server, 512, [](uv_stream_t* server, int status){
 		((Server*) server->data)->OnConnection(server, status);
 	}) != 0){
-		fprintf(stderr, "ws28: Couldn't start listening\n");
 		uv_close((uv_handle_t*) &m_Server, nullptr);
-		abort();
+		return false;
 	}
+	
+	m_Server.data = this;
+	return true;
+}
+
+void Server::StopListening(){
+	if(m_Server.data != this) return;
+	uv_close((uv_handle_t*) &m_Server, nullptr);
+	m_Server.data = nullptr;
 }
 
 Server::~Server(){
+	StopListening();
+	
 	while(!m_Clients.empty()){
 		m_Clients.back()->Destroy(); // This will remove the client from the vector
 	}
-	
-	uv_close((uv_handle_t*) &m_Server, nullptr);
 }
 
 void Server::OnConnection(uv_stream_t* server, int status){
@@ -80,19 +93,10 @@ void Server::NotifyClientDestroyed(Client *client, bool handshakeCompleted){
 	
 	for(auto it = m_Clients.begin(); it != m_Clients.end(); ++it){
 		if(*it == client){
-			client->ClearServer();
 			m_Clients.erase(it);
 			break;
 		}
 	}
-}
-
-void Server::DetachClients(){
-	for(auto &c : m_Clients){
-		c->ClearServer();
-	}
-	
-	m_Clients.clear();
 }
 
 }

@@ -2,7 +2,7 @@
 #include <sstream>
 
 int main(){
-	ws28::Server s{8080, uv_default_loop()};
+	ws28::Server s{uv_default_loop()};
 	
 	static intptr_t userID = 0;
 	
@@ -32,6 +32,7 @@ int main(){
 		res.send(ss.str());
 	});
 	
+	assert(s.Listen(3000));
 	puts("Listening");
 	uv_run(uv_default_loop(), UV_RUN_DEFAULT);
 }
