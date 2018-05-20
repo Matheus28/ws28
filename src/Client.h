@@ -55,7 +55,6 @@ namespace ws28 {
 		size_t GetDataFrameHeaderSize(size_t len);
 		void WriteDataFrameHeader(uint8_t opcode, size_t len, char *out);
 		void EncryptAndWrite(const char *data, size_t len);
-		void WriteRaw(const char *data, size_t len);
 		
 		void OnRawSocketData(char *data, size_t len);
 		void OnSocketData(char *data, size_t len);
@@ -66,8 +65,7 @@ namespace ws28 {
 		
 		void Write(const char *data){ Write(data, strlen(data)); }
 		void Write(const char *data, size_t len);
-		void Write(std::unique_ptr<char[]> data, size_t len);
-		void WriteRaw(std::unique_ptr<char[]> data, size_t len);
+		void WriteRaw(const char *data, size_t len);
 		void WriteRawQueue(std::unique_ptr<char[]> data, size_t len);
 		
 		void Cork(bool v);

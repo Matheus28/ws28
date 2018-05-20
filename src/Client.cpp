@@ -393,7 +393,7 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		assert(bufLen >= 0 && (size_t) bufLen < sizeof(buf));
 		
-		Write(ToUniqueBuffer(buf, bufLen), bufLen);
+		Write(buf, bufLen);
 		
 		m_bHasCompletedHandshake = true;
 		
@@ -558,11 +558,10 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 void Client::Send(const char *data, size_t len, uint8_t opCode){
 	if(!m_Socket) return;
 	
-	auto fdata = std::make_unique<char[]>(len + GetDataFrameHeaderSize(len));
-	
-	WriteDataFrameHeader(opCode, len, fdata.get());
-	memcpy(fdata.get() + GetDataFrameHeaderSize(len), data, len);
-	Write(std::move(fdata), len + GetDataFrameHeaderSize(len));
+	char header[16];
+	WriteDataFrameHeader(opCode, len, header);
+	Write(header, GetDataFrameHeaderSize(len));
+	Write(data, len);
 }
 
 
@@ -574,7 +573,7 @@ void Client::InitSecure(){
 void Client::FlushTLS(){
 	assert(m_pTLS != nullptr);
 	m_pTLS->ForEachPendingWrite([&](const char *data, size_t len){
-		WriteRaw(ToUniqueBuffer(data, len), len);
+		WriteRaw(data, len);
 	});
 }
 
@@ -583,19 +582,9 @@ void Client::Write(const char *data, size_t len){
 		if(!m_pTLS->Write(data, len)) return Destroy();
 		FlushTLS();
 	}else{
-		WriteRaw(ToUniqueBuffer(data, len), len);
+		WriteRaw(data, len);
 	}
 }
-
-void Client::Write(std::unique_ptr<char[]> data, size_t len){
-	if(IsSecure()){
-		if(!m_pTLS->Write(data.get(), len)) return Destroy();
-		FlushTLS();
-	}else{
-		WriteRaw(std::move(data), len);
-	}
-}
-
 
 std::unique_ptr<char[]> Client::ToUniqueBuffer(const char *buf, size_t len){
 	auto d = std::make_unique<char[]>(len);
@@ -604,12 +593,12 @@ std::unique_ptr<char[]> Client::ToUniqueBuffer(const char *buf, size_t len){
 }
 
 
-void Client::WriteRaw(std::unique_ptr<char[]> data, size_t len){
+void Client::WriteRaw(const char* data, size_t len){
 	if(!m_Socket) return;
 	
 	// Try to write without allocating memory first, if that doesn't work, we call WriteRawQueue
 	uv_buf_t buf;
-	buf.base = data.get();
+	buf.base = (char*) data;
 	buf.len = len;
 	
 	int written = uv_try_write((uv_stream_t*) m_Socket.get(), &buf, 1);
@@ -624,14 +613,14 @@ void Client::WriteRaw(std::unique_ptr<char[]> data, size_t len){
 			// We need to reallocate the buffer so it gets freed properly
 			// There are better ways to do this, but I'm lazy
 			
-			WriteRawQueue(ToUniqueBuffer(data.get() + written, len - written), len - written);
+			WriteRawQueue(ToUniqueBuffer(data + written, len - written), len - written);
 		}else{
 			// Write error
 			Destroy();
 			return;
 		}
 	}else{
-		WriteRawQueue(std::move(data), len);
+		WriteRawQueue(ToUniqueBuffer(data, len), len);
 	}
 }
 
