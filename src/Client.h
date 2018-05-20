@@ -12,6 +12,7 @@
 
 namespace ws28 {
 	namespace detail {
+		struct Corker;
 		struct SocketDeleter {
 			void operator()(uv_tcp_t *socket) const {
 				if(socket == nullptr) return;
@@ -69,6 +70,7 @@ namespace ws28 {
 		void WriteRawQueue(std::unique_ptr<char[]> data, size_t len);
 		
 		void Cork(bool v);
+		void ForceCork(bool v);
 		
 		std::unique_ptr<char[]> ToUniqueBuffer(const char *buf, size_t len);
 		
@@ -82,10 +84,13 @@ namespace ws28 {
 		std::unique_ptr<TLS> m_pTLS;
 		std::vector<DataFrame> m_Frames;
 		
+		size_t m_iCorkCounter = 0;
+		
 		size_t m_iBufferPos = 0;
 		std::unique_ptr<char[]> m_Buffer;
 		
 		friend class Server;
+		friend struct detail::Corker;
 		friend class std::unique_ptr<Client>;
 	};
 	

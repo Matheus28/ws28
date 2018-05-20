@@ -18,6 +18,13 @@ namespace detail {
 			++b;
 		}
 	}
+	
+	struct Corker {
+		Client &client;
+		
+		Corker(Client &client) : client(client) { client.Cork(true); }
+		~Corker(){ client.Cork(false); }
+	};
 }
 
 struct DataFrameHeader {
@@ -92,6 +99,10 @@ Client::~Client(){
 
 void Client::Destroy(){
 	if(!m_Socket) return;
+	
+	// This will permanently uncork our socket
+	++m_iCorkCounter;
+	ForceCork(false);
 	
 	m_Socket->data = nullptr;
 	
@@ -406,14 +417,7 @@ void Client::OnSocketData(char *data, size_t len){
 		return;
 	}
 	
-	struct Corker {
-		Client &client;
-		
-		Corker(Client &client) : client(client) { client.Cork(true); }
-		~Corker(){ client.Cork(false); }
-	};
-	
-	Corker corker{*this};
+	detail::Corker corker{*this};
 	
 	for(;;){
 		// Not enough to read the header
@@ -655,6 +659,14 @@ void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
 void Client::Cork(bool v){
 	if(!m_Socket) return;
 	
+	if(v){
+		if(m_iCorkCounter++ == 0) ForceCork(true);
+	}else{
+		if(--m_iCorkCounter == 0) ForceCork(false);
+	}
+}
+	
+void Client::ForceCork(bool v){
 	int enable = v;
 	uv_os_fd_t fd;
 	uv_fileno((uv_handle_t*) m_Socket.get(), &fd);
