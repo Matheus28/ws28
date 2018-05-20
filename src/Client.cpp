@@ -610,6 +610,7 @@ std::unique_ptr<char[]> Client::ToUniqueBuffer(const char *buf, size_t len){
 
 void Client::WriteRaw(const char* data, size_t len){
 	if(!m_Socket) return;
+	if(len == 0) return;
 	
 	// Try to write without allocating memory first, if that doesn't work, we call WriteRawQueue
 	uv_buf_t buf;
