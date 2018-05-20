@@ -62,20 +62,20 @@ struct DataFrameHeader {
 	}
 };
 
-Client::Client(Server *server, uv_tcp_t *h) : m_pServer(server), m_pSocket(h){
-	m_pSocket->data = this;
+Client::Client(Server *server, SocketHandle socket) : m_pServer(server), m_Socket(std::move(socket)){
+	m_Socket->data = this;
 	
 	// Default to true since that's what most people want
-	uv_tcp_nodelay(m_pSocket, true);
+	uv_tcp_nodelay(m_Socket.get(), true);
 	
-	uv_read_start((uv_stream_t*) m_pSocket, [](uv_handle_t*, size_t suggested_size, uv_buf_t *buf){
+	uv_read_start((uv_stream_t*) m_Socket.get(), [](uv_handle_t*, size_t suggested_size, uv_buf_t *buf){
 		buf->base = new char[suggested_size];
 		buf->len = suggested_size;
 	}, [](uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf){
 		auto client = (Client*) stream->data;
 		
 		// Both checks are needed because when we're destroying, only the second one is false
-		if(client != nullptr && client->m_pSocket != nullptr){
+		if(client != nullptr && client->m_Socket){
 			if(nread < 0){
 				client->Destroy();
 			}else if(nread > 0){
@@ -88,30 +88,29 @@ Client::Client(Server *server, uv_tcp_t *h) : m_pServer(server), m_pSocket(h){
 }
 
 Client::~Client(){
-	assert(m_pSocket == nullptr);
+	assert(!m_Socket);
 }
 
 void Client::Destroy(){
-	if(!m_pSocket) return;
-	uv_tcp_t* socket = m_pSocket;
-	m_pSocket = nullptr;
+	if(!m_Socket) return;
+	
+	// Remove socket from our object, we'll put it in the shutdown request soon
+	SocketHandle tmp = std::move(m_Socket);
 	
 	m_pServer->NotifyClientDestroyed(this, m_bHasCompletedHandshake);
 	m_pServer = nullptr;
 	
-	auto req = new uv_shutdown_t;
-	req->data = socket;
+	struct ShutdownRequest : uv_shutdown_t {
+		SocketHandle socket;
+	};
 	
-	uv_shutdown(req, (uv_stream_t*) socket, [](uv_shutdown_t* req, int){
-		auto socket = (uv_tcp_t*) req->data;
+	auto req = new ShutdownRequest;
+	req->socket = std::move(tmp);
+	
+	uv_shutdown(req, (uv_stream_t*) req->socket.get(), [](uv_shutdown_t* reqq, int){
+		auto req = (ShutdownRequest*) reqq;
 		
-		delete (Client*) socket->data;
-		socket->data = nullptr;
-		
-		uv_close((uv_handle_t*) socket, [](uv_handle_t *h){
-			delete (uv_tcp_t*) h;
-		});
-		
+		delete (Client*) req->socket->data;
 		delete req;
 	});
 }
@@ -163,7 +162,7 @@ size_t Client::GetDataFrameHeaderSize(size_t len){
 
 void Client::OnRawSocketData(char *data, size_t len){
 	if(len == 0) return;
-	if(!m_pSocket) return;
+	if(!m_Socket) return;
 	
 	if(m_bWaitingForFirstPacket){
 		m_bWaitingForFirstPacket = false;
@@ -557,7 +556,7 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 }
 
 void Client::Send(const char *data, size_t len, uint8_t opCode){
-	if(!m_pSocket) return;
+	if(!m_Socket) return;
 	
 	auto fdata = std::make_unique<char[]>(len + GetDataFrameHeaderSize(len));
 	
@@ -606,14 +605,14 @@ std::unique_ptr<char[]> Client::ToUniqueBuffer(const char *buf, size_t len){
 
 
 void Client::WriteRaw(std::unique_ptr<char[]> data, size_t len){
-	if(!m_pSocket) return;
+	if(!m_Socket) return;
 	
 	// Try to write without allocating memory first, if that doesn't work, we call WriteRawQueue
 	uv_buf_t buf;
 	buf.base = data.get();
 	buf.len = len;
 	
-	int written = uv_try_write((uv_stream_t*) m_pSocket, &buf, 1);
+	int written = uv_try_write((uv_stream_t*) m_Socket.get(), &buf, 1);
 	if(written != UV_EAGAIN){
 		assert(written != 0);
 		if(written > 0){
@@ -650,7 +649,7 @@ void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
 	request->client = this;
 	request->data = std::move(data);
 	
-	if(uv_write(&request->req, (uv_stream_t*) m_pSocket, &request->buf, 1, [](uv_write_t* req, int status){
+	if(uv_write(&request->req, (uv_stream_t*) m_Socket.get(), &request->buf, 1, [](uv_write_t* req, int status){
 		auto request = (CustomWriteRequest*) req;
 
 		if(status < 0){
@@ -665,11 +664,11 @@ void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
 }
 
 void Client::Cork(bool v){
-	if(!m_pSocket) return;
+	if(!m_Socket) return;
 	
 	int enable = v;
 	uv_os_fd_t fd;
-	uv_fileno((uv_handle_t*) m_pSocket, &fd);
+	uv_fileno((uv_handle_t*) m_Socket.get(), &fd);
 	
 	// Shamelessly copied from uWebSockets
 #if defined(TCP_CORK)

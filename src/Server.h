@@ -100,7 +100,7 @@ namespace ws28 {
 		}
 		
 		uv_loop_t *m_pLoop;
-		uv_tcp_t m_Server;
+		SocketHandle m_Server;
 		SSL_CTX *m_pSSLContext;
 		void *m_pUserData = nullptr;
 		std::vector<Client*> m_Clients;

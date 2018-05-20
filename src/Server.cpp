@@ -18,19 +18,19 @@ Server::Server(uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx
 		return strcmp(origin, host) == 0;
 	};
 	
-	// m_Server.data = nullptr means we're not listening
-	// m_Server.data = this means we are
-	m_Server.data = nullptr;
 }
 
 bool Server::Listen(int port, bool ipv4Only){
-	if(m_Server.data != nullptr) return false;
+	if(m_Server) return false;
 	
 #ifndef _WIN32
 	signal(SIGPIPE, SIG_IGN);
 #endif
 	
-	uv_tcp_init(m_pLoop, &m_Server);
+	auto server = SocketHandle{new uv_tcp_t};
+	uv_tcp_init(m_pLoop, server.get());
+	server->data = this;
+	
 	struct sockaddr_storage addr;
 	
 	if(ipv4Only){
@@ -39,28 +39,29 @@ bool Server::Listen(int port, bool ipv4Only){
 		uv_ip6_addr("::0", port, (struct sockaddr_in6*) &addr);
 	}
 	
-	uv_tcp_nodelay(&m_Server, (int) true);
+	uv_tcp_nodelay(server.get(), (int) true);
 	
-	if(uv_tcp_bind(&m_Server, (struct sockaddr*) &addr, 0) != 0){
-		uv_close((uv_handle_t*) &m_Server, nullptr);
+	if(uv_tcp_bind(server.get(), (struct sockaddr*) &addr, 0) != 0){
+		uv_close((uv_handle_t*) server.get(), nullptr);
 		return false;
 	}
 	
-	if(uv_listen((uv_stream_t*) &m_Server, 512, [](uv_stream_t* server, int status){
+	if(uv_listen((uv_stream_t*) server.get(), 512, [](uv_stream_t* server, int status){
 		((Server*) server->data)->OnConnection(server, status);
 	}) != 0){
-		uv_close((uv_handle_t*) &m_Server, nullptr);
+		uv_close((uv_handle_t*) server.get(), nullptr);
 		return false;
 	}
 	
-	m_Server.data = this;
+	m_Server = std::move(server);
 	return true;
 }
 
 void Server::StopListening(){
-	if(m_Server.data != this) return;
-	uv_close((uv_handle_t*) &m_Server, nullptr);
-	m_Server.data = nullptr;
+	// Just in case we have more logic in the future
+	if(!m_Server) return;
+	
+	m_Server.reset();
 }
 
 Server::~Server(){
@@ -76,16 +77,13 @@ Server::~Server(){
 void Server::OnConnection(uv_stream_t* server, int status){
 	if(status < 0) return;
 	
-	uv_tcp_t *socket = new uv_tcp_t;
+	SocketHandle socket{new uv_tcp_t};
+	uv_tcp_init(m_pLoop, socket.get());
+	
 	socket->data = nullptr;
 
-	uv_tcp_init(uv_default_loop(), socket);
-	if(uv_accept(server, (uv_stream_t*) socket) == 0){
-		m_Clients.push_back(new Client(this, socket));
-	}else{
-		uv_close((uv_handle_t*) socket, [](uv_handle_t *socket){
-			delete (uv_tcp_t*) socket;
-		});
+	if(uv_accept(server, (uv_stream_t*) socket.get()) == 0){
+		m_Clients.push_back(new Client(this, std::move(socket)));
 	}
 }
 

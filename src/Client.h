@@ -11,6 +11,19 @@
 #include "TLS.h"
 
 namespace ws28 {
+	namespace detail {
+		struct SocketDeleter {
+			void operator()(uv_tcp_t *socket) const {
+				if(socket == nullptr) return;
+				uv_close((uv_handle_t*) socket, [](uv_handle_t *h){
+					delete (uv_tcp_t*) h;
+				});
+			}
+		};
+	}
+	
+	typedef std::unique_ptr<uv_tcp_t, detail::SocketDeleter> SocketHandle;
+	
 	class Server;
 	class Client {
 		enum { MAX_MESSAGE_SIZE = 16 * 1024 };
@@ -34,7 +47,7 @@ namespace ws28 {
 			std::vector<char> data;
 		};
 		
-		Client(Server *server, uv_tcp_t *h);
+		Client(Server *server, SocketHandle socket);
 		
 		Client(const Client &other) = delete;
 		Client& operator=(Client &other) = delete;
@@ -63,7 +76,7 @@ namespace ws28 {
 		
 		
 		Server *m_pServer;
-		uv_tcp_t *m_pSocket;
+		SocketHandle m_Socket;
 		void *m_pUserData = nullptr;
 		bool m_bWaitingForFirstPacket = true;
 		bool m_bHasCompletedHandshake = false;
