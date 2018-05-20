@@ -1,7 +1,18 @@
 #include "src/Server.h"
 #include <sstream>
 
+
 int main(){
+	static volatile sig_atomic_t quit = false;
+	
+	signal(SIGINT, [](int){
+		if(quit){
+			exit(1);
+		}else{
+			quit = true;
+		}
+	});
+	
 	ws28::Server s{uv_default_loop()};
 	
 	static intptr_t userID = 0;
@@ -32,7 +43,22 @@ int main(){
 		res.send(ss.str());
 	});
 	
+	uv_idle_t idler;
+	uv_idle_init(uv_default_loop(), &idler);
+	idler.data = &s;
+	uv_idle_start(&idler, [](uv_idle_t *idler){
+		if(quit){
+			puts("Quitting gracefully...");
+			auto &s = *(ws28::Server*)(idler->data);
+			s.StopListening();
+			s.DestroyClients();
+			uv_idle_stop(idler);
+		}
+	});
+	
 	assert(s.Listen(3000));
+	
 	puts("Listening");
 	uv_run(uv_default_loop(), UV_RUN_DEFAULT);
+	puts("Clean quit");
 }
