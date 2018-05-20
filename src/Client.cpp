@@ -426,7 +426,10 @@ void Client::OnSocketData(char *data, size_t len){
 		DataFrameHeader header(buffer);
 		
 		if(header.rsv1() || header.rsv2() || header.rsv3()) return Destroy();
-
+		
+		// Clients MUST mask their headers
+		if(!header.mask()) return Destroy();
+		
 		char *curPosition = buffer + 2;
 
 		size_t frameLength = header.len();
