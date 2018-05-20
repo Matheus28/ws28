@@ -42,14 +42,12 @@ bool Server::Listen(int port, bool ipv4Only){
 	uv_tcp_nodelay(server.get(), (int) true);
 	
 	if(uv_tcp_bind(server.get(), (struct sockaddr*) &addr, 0) != 0){
-		uv_close((uv_handle_t*) server.get(), nullptr);
 		return false;
 	}
 	
 	if(uv_listen((uv_stream_t*) server.get(), 512, [](uv_stream_t* server, int status){
 		((Server*) server->data)->OnConnection(server, status);
 	}) != 0){
-		uv_close((uv_handle_t*) server.get(), nullptr);
 		return false;
 	}
 	
