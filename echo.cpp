@@ -26,9 +26,9 @@ int main(){
 		//printf("Client %d disconnected\n", (int) (intptr_t) client->GetUserData());
 	});
 	
-	s.SetClientDataCallback([](ws28::Client *client, const char *data, size_t len){
+	s.SetClientDataCallback([](ws28::Client *client, const char *data, size_t len, int opcode){
 		//printf("Client %d: %.*s\n", (int) (intptr_t) client->GetUserData(), (int) len, data);
-		client->Send(data, len);
+		client->Send(data, len, opcode);
 	});
 	
 	s.SetHTTPCallback([](ws28::HTTPRequest &req, ws28::HTTPResponse &res){

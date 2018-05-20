@@ -566,7 +566,7 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 		// Close
 		Destroy();
 	}else if(opcode == 1 || opcode == 2){
-		m_pServer->NotifyClientData(this, data, len);
+		m_pServer->NotifyClientData(this, data, len, opcode);
 	}
 }
 

@@ -43,7 +43,7 @@ namespace ws28 {
 		typedef bool (*CheckConnectionFn)(HTTPRequest&);
 		typedef void (*ClientConnectedFn)(Client *);
 		typedef void (*ClientDisconnectedFn)(Client *);
-		typedef void (*ClientDataFn)(Client *, const char *, size_t);
+		typedef void (*ClientDataFn)(Client *, const char *data, size_t len, int opcode);
 		typedef void (*HTTPRequestFn)(HTTPRequest&, HTTPResponse&);
 	public:
 		
@@ -96,8 +96,8 @@ namespace ws28 {
 		
 		std::unique_ptr<Client> NotifyClientDestroyed(Client *client, bool handshakeCompleted);
 		
-		void NotifyClientData(Client *client, const char *data, size_t len){
-			if(m_fnClientData) m_fnClientData(client, data, len);
+		void NotifyClientData(Client *client, const char *data, size_t len, int opcode){
+			if(m_fnClientData) m_fnClientData(client, data, len, opcode);
 		}
 		
 		uv_loop_t *m_pLoop;
