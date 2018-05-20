@@ -19,7 +19,9 @@ Mostly. It doesn't do the closing handshake properly (it simply kills the connec
 
 2. Create a server:
 
-    ws28::Server server{uv_default_loop(), SSL_CTX* or NULL};
+```c++
+ws28::Server server{uv_default_loop(), SSL_CTX* or nullptr};
+```
 
 Note: if you have a secure server, it'll actually listen for both secure and insecure connections on that same port
 by sniffing the first byte. This allows you to run insecure websocket servers on port 443 and not deal with the swarm
@@ -27,11 +29,13 @@ of broken proxies out there.
 
 3. Set up some callbacks
 
-    See `src/Server.h`.
+    See `src/Server.h`. But basically, you need some or all of these methods from `ws28::Server`: `SetClientConnectedCallback`, `SetClientDisconnectedCallback`, `SetClientDataCallback`, `SetCheckConnectionCallback` and `SetHTTPCallback`.
 
 4. Listen
 
-    server.Listen(port);
+```c++
+server.Listen(port);
+```
 
 ## What's the license?
 
