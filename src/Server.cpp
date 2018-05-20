@@ -42,7 +42,6 @@ bool Server::Listen(int port, bool ipv4Only){
 	uv_tcp_nodelay(&m_Server, (int) true);
 	
 	if(uv_tcp_bind(&m_Server, (struct sockaddr*) &addr, 0) != 0){
-		fprintf(stderr, "ws28: Couldn't bind\n");
 		uv_close((uv_handle_t*) &m_Server, nullptr);
 		return false;
 	}
