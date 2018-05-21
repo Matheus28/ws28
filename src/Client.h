@@ -47,7 +47,8 @@ namespace ws28 {
 		
 		struct DataFrame {
 			uint8_t opcode;
-			std::vector<char> data;
+			std::unique_ptr<char[]> data;
+			size_t len;
 		};
 		
 		Client(Server *server, SocketHandle socket);

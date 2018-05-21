@@ -606,8 +606,8 @@ void Client::OnSocketData(char *data, size_t len){
 			}
 			
 			{
-				DataFrame frame{ header.opcode(), { curPosition, curPosition + frameLength } };
-				Unmask(frame.data.data(), frame.data.size());
+				DataFrame frame{ header.opcode(), ToUniqueBuffer(curPosition, frameLength), frameLength };
+				Unmask(frame.data.get(), frame.len);
 				m_Frames.emplace_back(std::move(frame));
 			}
 			
@@ -615,7 +615,7 @@ void Client::OnSocketData(char *data, size_t len){
 			
 			size_t totalLength = 0;
 			for(DataFrame &frame : m_Frames){
-				totalLength += frame.data.size();
+				totalLength += frame.len;
 			}
 			
 			if(totalLength >= m_pServer->m_iMaxMessageSize) return Close(1009, "Message too large");
@@ -627,8 +627,8 @@ void Client::OnSocketData(char *data, size_t len){
 				
 				size_t allFramesPos = 0;
 				for(DataFrame &frame : m_Frames){
-					memcpy(allFrames.get() + allFramesPos, frame.data.data(), frame.data.size());
-					allFramesPos += frame.data.size();
+					memcpy(allFrames.get() + allFramesPos, frame.data.get(), frame.len);
+					allFramesPos += frame.len;
 				}
 
 				ProcessDataFrame(m_Frames[0].opcode, allFrames.get(), totalLength);
