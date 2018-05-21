@@ -128,20 +128,29 @@ void Client::Destroy(){
 	// Remove socket from our object, we'll put it in the shutdown request soon
 	SocketHandle tmp = std::move(m_Socket);
 	
-	auto myself = m_pServer->NotifyClientDestroyed(this, m_bHasCompletedHandshake);
-	m_pServer = nullptr;
+	auto myself = m_pServer->NotifyClientPreDestroyed(this);
 	
 	struct ShutdownRequest : uv_shutdown_t {
 		SocketHandle socket;
 		std::unique_ptr<Client> client;
+		Server::ClientDisconnectedFn cb;
 	};
 	
 	auto req = new ShutdownRequest();
 	req->socket = std::move(tmp);
 	req->client = std::move(myself);
+	req->cb = m_pServer->m_fnClientDisconnected;
+	
+	m_pServer = nullptr;
 	
 	uv_shutdown(req, (uv_stream_t*) req->socket.get(), [](uv_shutdown_t* reqq, int){
-		delete (ShutdownRequest*) reqq;
+		auto req = (ShutdownRequest*) reqq;
+		
+		if(req->cb && req->client->m_bHasCompletedHandshake){
+			req->cb(req->client.get());
+		}
+		
+		delete req;
 	});
 }
 

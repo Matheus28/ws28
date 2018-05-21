@@ -71,7 +71,9 @@ namespace ws28 {
 		void SetClientConnectedCallback(ClientConnectedFn v){ m_fnClientConnected = v; }
 		
 		// This callback is called when a client disconnects
-		// This is paired with the connected callback
+		// This is paired with the connected callback, and will *always* be called for clients that called the other callback
+		// Note that clients grab this value when you call Destroy on them, so changing this after clients are connected
+		// might lead to weird results. In practice, just set it once and forget about it.
 		void SetClientDisconnectedCallback(ClientDisconnectedFn v){ m_fnClientDisconnected = v; }
 		
 		// This callback is called when the client receives a data frame
@@ -101,7 +103,7 @@ namespace ws28 {
 			if(m_fnClientConnected) m_fnClientConnected(client);
 		}
 		
-		std::unique_ptr<Client> NotifyClientDestroyed(Client *client, bool handshakeCompleted);
+		std::unique_ptr<Client> NotifyClientPreDestroyed(Client *client);
 		
 		void NotifyClientData(Client *client, const char *data, size_t len, int opcode){
 			if(m_fnClientData) m_fnClientData(client, data, len, opcode);

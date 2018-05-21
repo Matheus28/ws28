@@ -87,11 +87,7 @@ void Server::OnConnection(uv_stream_t* server, int status){
 	}
 }
 
-std::unique_ptr<Client> Server::NotifyClientDestroyed(Client *client, bool handshakeCompleted){
-	if(m_fnClientDisconnected && handshakeCompleted){
-		m_fnClientDisconnected(client);
-	}
-	
+std::unique_ptr<Client> Server::NotifyClientPreDestroyed(Client *client){
 	for(auto it = m_Clients.begin(); it != m_Clients.end(); ++it){
 		if(it->get() == client){
 			std::unique_ptr<Client> r = std::move(*it);

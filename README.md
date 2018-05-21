@@ -46,8 +46,8 @@ Most files are MIT. The base64 and sha1 code are BSD, feel free to pull request 
 
 ### Can I store pointers to `ws28::Client`?
 
-Only between the ClientConnected and ClientDisconnected callbacks. The client will be deleted at the next event loop iteration after ClientDisconnected, or later.
+Only between the ClientConnected and ClientDisconnected callbacks.
 
 ### When is ClientDisconnected called?
 
-As soon as you call Destroy on a connected client. Just make sure to clean up everything there, the client object will still be valid for at least this event loop iteration. Any writes you try to make to the client will be safely ignored.
+It is called after `uv_shutdown` for that client's socket returns, so it might take a little while between your `Destroy` call and that callback getting called. Note that the Client pointer will get deleted immediately after that callback returns, so make sure you don't have it stored anywehre else.
