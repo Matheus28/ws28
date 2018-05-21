@@ -615,6 +615,8 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 		}
 	}else if(opcode == 1 || opcode == 2){
 		if(m_bIsClosing) return;
+		if(opcode == 1 && !IsValidUTF8(data, len)) return Close(1007, "Invalid UTF-8 in text frame");
+		
 		m_pServer->NotifyClientData(this, data, len, opcode);
 	}else{
 		return Close(1002, "Unknown op code");
