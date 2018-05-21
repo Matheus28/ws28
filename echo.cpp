@@ -17,6 +17,12 @@ int main(){
 	
 	static intptr_t userID = 0;
 	
+	// I recommend against setting these limits, they're way too high and allow easy DDoSes.
+	// Use the default settings. These are just here to pass tests
+	s.SetMaxMessageSize(256 * 1024 * 1024); // 256 MB
+	s.SetMaxMessageFrames(1024 * 1024); // 1 million
+	
+	
 	s.SetClientConnectedCallback([](ws28::Client *client){
 		client->SetUserData((void*) ++userID);
 		//printf("Client %d connected\n", (int) userID);

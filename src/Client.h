@@ -27,11 +27,12 @@ namespace ws28 {
 	
 	class Server;
 	class Client {
-		enum { MAX_MESSAGE_SIZE = 16 * 1024 };
 		enum { MAX_NUM_FRAMES = 1024 };
 	public:
 		~Client();
 		
+		// If reasonLen is -1, it'll use strlen
+		void Close(uint16_t code, const char *reason = nullptr, size_t reasonLen = -1);
 		void Destroy();
 		void Send(const char *data, size_t len, uint8_t opCode = 2);
 		
@@ -83,6 +84,7 @@ namespace ws28 {
 		void *m_pUserData = nullptr;
 		bool m_bWaitingForFirstPacket = true;
 		bool m_bHasCompletedHandshake = false;
+		bool m_bIsClosing = false;
 		
 		std::unique_ptr<TLS> m_pTLS;
 		std::vector<DataFrame> m_Frames;

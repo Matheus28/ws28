@@ -200,8 +200,12 @@ void Client::OnRawSocketData(char *data, size_t len){
 
 void Client::OnSocketData(char *data, size_t len){
 	// This gives us an extra byte just in case
-	if(m_iBufferPos + len + 1 >= MAX_MESSAGE_SIZE){
-		Destroy(); // Buffer overflow
+	if(m_iBufferPos + len + 1 >= m_pServer->m_iMaxMessageSize){
+		if(m_bHasCompletedHandshake){
+			Close(1009, "Message too large");
+		}
+		
+		Destroy();
 		return;
 	}
 	
@@ -236,7 +240,7 @@ void Client::OnSocketData(char *data, size_t len){
 		// Copy partial HTTP headers to our buffer
 		if(usingLocalBuffer && bufferLen > 0){
 			assert(m_iBufferPos == 0);
-			m_Buffer = std::make_unique<char[]>(MAX_MESSAGE_SIZE);
+			m_Buffer = std::make_unique<char[]>(m_pServer->m_iMaxMessageSize);
 			memcpy(m_Buffer.get(), buffer, bufferLen);
 			m_iBufferPos = bufferLen;
 		}
@@ -433,10 +437,10 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		DataFrameHeader header(buffer);
 		
-		if(header.rsv1() || header.rsv2() || header.rsv3()) return Destroy();
+		if(header.rsv1() || header.rsv2() || header.rsv3()) return Close(1002, "Reserved bit used");
 		
 		// Clients MUST mask their headers
-		if(!header.mask()) return Destroy();
+		if(!header.mask()) return Close(1002, "Clients must mask their payload");
 		
 		char *curPosition = buffer + 2;
 
@@ -483,10 +487,8 @@ void Client::OnSocketData(char *data, size_t len){
 		};
 		
 		if(header.opcode() >= 0x08){
-			// Op codes can also never be fragmented
-			if(!header.fin()) return Destroy();
-			// Control frames can only have up to 125 octets
-			if(frameLength > 125) return Destroy();
+			if(!header.fin()) return Close(1002, "Control op codes can't be fragmented");
+			if(frameLength > 125) return Close(1002, "Control op codes can't be more than 125 bytes");
 			
 			
 			Unmask((char*) curPosition, frameLength);
@@ -497,11 +499,9 @@ void Client::OnSocketData(char *data, size_t len){
 			ProcessDataFrame(header.opcode(), curPosition, frameLength);
 		}else{
 			if(m_Frames.empty()){
-				if(header.opcode() == 0) return Destroy();
+				if(header.opcode() == 0) return Close(1002, "Unexpected continuation frame");
 			}else{
-				if(header.opcode() != 0){
-					return Destroy(); // Must be continuation frame op code
-				}
+				if(header.opcode() != 0) return Close(1002, "Expected continuation frame");
 			}
 			
 			{
@@ -510,14 +510,14 @@ void Client::OnSocketData(char *data, size_t len){
 				m_Frames.emplace_back(std::move(frame));
 			}
 			
-			if(m_Frames.size() > MAX_NUM_FRAMES) return Destroy();
+			if(m_Frames.size() > m_pServer->m_iMaxMessageFrames) return Close(1009, "Too many frames");
 			
 			size_t totalLength = 0;
 			for(DataFrame &frame : m_Frames){
 				totalLength += frame.data.size();
 			}
 			
-			if(totalLength >= MAX_MESSAGE_SIZE) return Destroy();
+			if(totalLength >= m_pServer->m_iMaxMessageSize) return Close(1009, "Message too large");
 				
 			if(header.fin()){
 				// Assemble frame
@@ -565,20 +565,58 @@ void Client::OnSocketData(char *data, size_t len){
 
 void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 	if(opcode == 9){
+		if(m_bIsClosing) return;
 		// Ping
 		Send(data, len, 10); // Send Pong
 	}else if(opcode == 10){
 		// Pong
 	}else if(opcode == 8){
 		// Close
-		Destroy();
+		if(m_bIsClosing){
+			Destroy();
+		}else{
+			// Copy close message
+			m_bIsClosing = true;
+			detail::Corker corker{*this};
+			SendDataFrameHeader(len, 8);
+			Write(data, len);
+			
+			// We always close the tcp connection on our side, as allowed in 7.1.1
+			Destroy();
+		}
 	}else if(opcode == 1 || opcode == 2){
+		if(m_bIsClosing) return;
 		m_pServer->NotifyClientData(this, data, len, opcode);
 	}else{
-		// Unknown
-		Destroy();
+		return Close(1002, "Unknown op code");
 	}
 }
+
+void Client::Close(uint16_t code, const char *reason, size_t reasonLen){
+	if(m_bIsClosing) return;
+	
+	m_bIsClosing = true;
+	
+	char coded[2];
+	coded[0] = (code >> 8) & 0xFF;
+	coded[1] = (code >> 0) & 0xFF;
+	
+	if(reason == nullptr){
+		Send(coded, sizeof(coded), 8);
+	}else{
+		if(reasonLen == (size_t) -1) reasonLen = strlen(reason);
+		
+		detail::Corker corker{*this};
+		
+		SendDataFrameHeader(2 + reasonLen, 8);
+		Write(coded, sizeof(coded));
+		Write(reason, reasonLen);
+	}
+	
+	// We always close the tcp connection on our side, as allowed in 7.1.1
+	Destroy();
+}
+
 
 void Client::Send(const char *data, size_t len, uint8_t opCode){
 	if(!m_Socket) return;
