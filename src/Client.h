@@ -27,7 +27,6 @@ namespace ws28 {
 	
 	class Server;
 	class Client {
-		enum { MAX_NUM_FRAMES = 1024 };
 	public:
 		~Client();
 		
