@@ -510,6 +510,8 @@ void Client::OnSocketData(char *data, size_t len){
 				m_Frames.emplace_back(std::move(frame));
 			}
 			
+			if(m_Frames.size() > MAX_NUM_FRAMES) return Destroy();
+			
 			size_t totalLength = 0;
 			for(DataFrame &frame : m_Frames){
 				totalLength += frame.data.size();

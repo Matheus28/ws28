@@ -28,6 +28,7 @@ namespace ws28 {
 	class Server;
 	class Client {
 		enum { MAX_MESSAGE_SIZE = 16 * 1024 };
+		enum { MAX_NUM_FRAMES = 1024 };
 	public:
 		~Client();
 		
