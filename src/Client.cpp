@@ -647,6 +647,7 @@ void Client::FlushTLS(){
 }
 
 void Client::Write(const char *data, size_t len){
+	if(!m_Socket) return;
 	if(IsSecure()){
 		if(!m_pTLS->Write(data, len)) return Destroy();
 		FlushTLS();
