@@ -509,7 +509,7 @@ void Client::OnSocketData(char *data, size_t len){
 		if(strcmp(method, "GET") != 0) return MalformedRequest();
 		
 		if(headers.m_hConnection == nullptr) return MalformedRequest();
-		if(!detail::equalsi(headers.m_hConnection, "upgrade")) return MalformedRequest();
+		if(strstr(headers.m_hConnection, "upgrade") == nullptr) return MalformedRequest();
 		
 		bool sendMyVersion = false;
 		
