@@ -37,6 +37,8 @@ of broken proxies out there.
 server.Listen(port);
 ```
 
+You can also check `echo.cpp` for an echo server implementation.
+
 ## What's the license?
 
 Most files are MIT. The base64 and sha1 code are BSD, feel free to pull request some MIT licensed code to replace those.
