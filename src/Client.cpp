@@ -509,6 +509,8 @@ void Client::OnSocketData(char *data, size_t len){
 		if(strcmp(method, "GET") != 0) return MalformedRequest();
 		
 		if(headers.m_hConnection == nullptr) return MalformedRequest();
+		
+		// Hackish, ideally we should check it's surrounded by commas (or start/end of string)
 		if(strstr(headers.m_hConnection, "upgrade") == nullptr) return MalformedRequest();
 		
 		bool sendMyVersion = false;
