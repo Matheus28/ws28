@@ -48,4 +48,4 @@ Most files are MIT. The base64 and sha1 code are BSD, feel free to pull request 
 
 ### Can I store pointers to `ws28::Client`?
 
-Only between the ClientConnected and ClientDisconnected callbacks.
+Only between ClientConnected and ClientDisconnected callbacks for each client. It is deleted immediately after ClientDisconnected.
