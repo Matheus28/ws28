@@ -50,4 +50,4 @@ Only between the ClientConnected and ClientDisconnected callbacks.
 
 ### When is ClientDisconnected called?
 
-It is called after `uv_shutdown` for that client's socket returns, so it might take a little while between your `Destroy` call and that callback getting called. Note that the Client pointer will get deleted immediately after that callback returns, so make sure you don't have it stored anywhere when you return from the callback.
+It is called after the callback of `uv_shutdown` for that client's socket is called. In short, it might take a little while between your `Destroy` call and that callback getting called. Note that the Client pointer will get deleted immediately after that callback returns, so make sure you don't have it stored anywhere when you return from the callback.
