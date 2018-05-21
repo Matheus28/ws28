@@ -30,6 +30,9 @@ public:
 		SSL_free(m_SSL);
 	}
 	
+	TLS(const TLS &other) = delete;
+	TLS& operator=(const TLS &other) = delete;
+	
 	// Writes unencrypted bytes to be encrypted and sent out
 	// If this returns false, the connection must be closed
 	bool Write(const char *buf, size_t len){
