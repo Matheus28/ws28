@@ -19,6 +19,51 @@ namespace detail {
 		}
 	}
 	
+	bool equalsi(const char *a, const char *b, size_t n){
+		while(n--){
+			if(tolower(*a) != tolower(*b)) return false;
+			if(!*a) return true;
+			
+			++a;
+			++b;
+		}
+		
+		return true;
+	}
+	
+	bool HeaderContains(const char *header, const char *substring){
+		bool hasMatch = false;
+		size_t substringLen = strlen(substring);
+		while(*header){
+			if(*header == ' ' || *header == '\t'){
+				++header;
+				continue;
+			}
+			
+			if(hasMatch){
+				if(*header == ',') return true;
+				hasMatch = false;
+				++header;
+				
+				// Skip to comma or end of string
+				while(*header && *header != ',') ++header;
+				if(*header == ',') ++header;
+			}else{
+				if(detail::equalsi(header, substring, substringLen)){
+					hasMatch = true;
+					header += substringLen;
+				}else{
+					++header;
+					while(*header && *header != ',') ++header;
+					if(*header == ',') ++header;
+				}
+			}
+		}
+		
+		return hasMatch;
+	}
+	
+	
 	struct Corker {
 		Client &client;
 		
@@ -511,7 +556,7 @@ void Client::OnSocketData(char *data, size_t len){
 		if(headers.m_hConnection == nullptr) return MalformedRequest();
 		
 		// Hackish, ideally we should check it's surrounded by commas (or start/end of string)
-		if(strstr(headers.m_hConnection, "upgrade") == nullptr) return MalformedRequest();
+		if(!detail::HeaderContains(headers.m_hConnection, "upgrade")) return MalformedRequest();
 		
 		bool sendMyVersion = false;
 		
