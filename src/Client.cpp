@@ -75,6 +75,27 @@ Client::Client(Server *server, SocketHandle socket) : m_pServer(server), m_Socke
 	// Default to true since that's what most people want
 	uv_tcp_nodelay(m_Socket.get(), true);
 	
+	{ // Put IP in m_IP
+		m_IP[0] = '\0';
+		struct sockaddr_storage addr;
+		int addrLen = sizeof(addr);
+		uv_tcp_getpeername(m_Socket.get(), (sockaddr*) &addr, &addrLen);
+		
+		if(addr.ss_family == AF_INET){
+			assert(uv_ip4_name((sockaddr_in*) &addr, m_IP, sizeof(m_IP)) == 0);
+		}else if(addr.ss_family == AF_INET6){
+			assert(uv_ip6_name((sockaddr_in6*) &addr, m_IP, sizeof(m_IP)) == 0);
+			
+			// Remove this prefix if it exists, it means that we actually have a ipv4
+			static const char *ipv4Prefix = "::ffff:";
+			if(strncmp(m_IP, ipv4Prefix, strlen(ipv4Prefix)) == 0){
+				memmove(m_IP, m_IP + strlen(ipv4Prefix), strlen(m_IP) - strlen(ipv4Prefix) + 1);
+			}
+		}else{
+			assert(false);
+		}
+	}
+	
 	uv_read_start((uv_stream_t*) m_Socket.get(), [](uv_handle_t*, size_t suggested_size, uv_buf_t *buf){
 		buf->base = new char[suggested_size];
 		buf->len = suggested_size;
@@ -433,6 +454,7 @@ void Client::OnSocketData(char *data, size_t len){
 			m_pServer,
 			method,
 			path,
+			m_IP,
 			headers,
 		};
 		

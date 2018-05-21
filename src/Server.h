@@ -15,6 +15,7 @@ namespace ws28 {
 		Server *server;
 		const char *method;
 		const char *path;
+		const char *ip;
 		
 		// Header keys are always lower case
 		const RequestHeaders &headers;

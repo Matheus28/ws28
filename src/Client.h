@@ -43,6 +43,8 @@ namespace ws28 {
 		
 		inline Server* GetServer(){ return m_pServer; }
 		
+		inline const char* GetIP(){ return m_IP; }
+		
 	private:
 		
 		struct DataFrame {
@@ -92,6 +94,7 @@ namespace ws28 {
 		bool m_bWaitingForFirstPacket = true;
 		bool m_bHasCompletedHandshake = false;
 		bool m_bIsClosing = false;
+		char m_IP[46];
 		
 		std::unique_ptr<TLS> m_pTLS;
 		std::vector<DataFrame> m_Frames;
