@@ -4,6 +4,7 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <cassert>
 
 #include "Client.h"
 
