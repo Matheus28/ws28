@@ -649,19 +649,19 @@ void Client::Close(uint16_t code, const char *reason, size_t reasonLen){
 }
 
 
-void Client::Send(const char *data, size_t len, uint8_t opCode){
+void Client::Send(const char *data, size_t len, uint8_t opcode){
 	if(!m_Socket) return;
 	
 	detail::Corker corker{*this};
 	
-	SendDataFrameHeader(len, opCode);
+	SendDataFrameHeader(len, opcode);
 	Write(data, len);
 }
 
-void Client::SendDataFrameHeader(size_t payloadLen, uint8_t opCode){
+void Client::SendDataFrameHeader(size_t payloadLen, uint8_t opcode){
 	if(!m_Socket) return;
 	char header[16];
-	WriteDataFrameHeader(opCode, payloadLen, header);
+	WriteDataFrameHeader(opcode, payloadLen, header);
 	Write(header, GetDataFrameHeaderSize(payloadLen));
 }
 
