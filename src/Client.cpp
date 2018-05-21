@@ -575,6 +575,35 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 		if(m_bIsClosing){
 			Destroy();
 		}else{
+			
+			if(len == 1){
+				Close(1002, "Incomplete close code");
+				return;
+			}else if(len >= 2){
+				bool invalid = false;
+				uint16_t code = (uint8_t(data[0]) << 8) | uint8_t(data[1]);
+				if(code < 1000 || code >= 5000) invalid = true;
+				
+				switch(code){
+				case 1004:
+				case 1005:
+				case 1006:
+				case 1015:
+					invalid = true;
+				default:;
+				}
+				
+				if(invalid){
+					Close(1002, "Invalid close code");
+					return;
+				}
+				
+				if(len > 2 && !IsValidUTF8(data + 2, len - 2)){
+					Close(1002, "Close reason is not UTF-8");
+					return;
+				}
+			}
+			
 			// Copy close message
 			m_bIsClosing = true;
 			detail::Corker corker{*this};
