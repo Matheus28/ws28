@@ -43,17 +43,18 @@ int main(){
 		res.send(ss.str());
 	});
 	
-	uv_idle_t idler;
-	uv_idle_init(uv_default_loop(), &idler);
-	idler.data = &s;
-	uv_idle_start(&idler, [](uv_idle_t *idler){
+	uv_timer_t timer;
+	uv_timer_init(uv_default_loop(), &timer);
+	timer.data = &s;
+	uv_timer_start(&timer, [](uv_timer_t *timer){
 		if(quit){
 			puts("Waiting for clients to disconnect, send another SIGINT to force quit");
-			auto &s = *(ws28::Server*)(idler->data);
+			auto &s = *(ws28::Server*)(timer->data);
 			s.StopListening();
-			uv_idle_stop(idler);
+			uv_timer_stop(timer);
+			uv_close((uv_handle_t*) timer, nullptr);
 		}
-	});
+	}, 10, 10);
 	
 	assert(s.Listen(3000));
 	
