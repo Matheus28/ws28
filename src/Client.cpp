@@ -200,7 +200,7 @@ void Client::OnRawSocketData(char *data, size_t len){
 
 void Client::OnSocketData(char *data, size_t len){
 	// This gives us an extra byte just in case
-	if(m_iBufferPos + len + 1 >= m_pServer->m_iMaxMessageSize){
+	if(m_Buffer.size() + len + 1 >= m_pServer->m_iMaxMessageSize){
 		if(m_bHasCompletedHandshake){
 			Close(1009, "Message too large");
 		}
@@ -218,20 +218,16 @@ void Client::OnSocketData(char *data, size_t len){
 	size_t bufferLen;
 	bool usingLocalBuffer;
 	
-	if(m_iBufferPos == 0){
-		assert(!m_Buffer);
+	if(m_Buffer.empty()){
 		usingLocalBuffer = true;
 		buffer = data;
 		bufferLen = len;
 	}else{
 		usingLocalBuffer = false;
 		
-		buffer = m_Buffer.get();
-		
-		memcpy(buffer + m_iBufferPos, data, len);
-		m_iBufferPos += len;
-		buffer[m_iBufferPos] = 0;
-		bufferLen = m_iBufferPos;
+		m_Buffer.insert(m_Buffer.end(), data, data + len);
+		buffer = m_Buffer.data();
+		bufferLen = m_Buffer.size();
 	}
 	
 	
@@ -239,10 +235,8 @@ void Client::OnSocketData(char *data, size_t len){
 	auto Bail = [&](){
 		// Copy partial HTTP headers to our buffer
 		if(usingLocalBuffer && bufferLen > 0){
-			assert(m_iBufferPos == 0);
-			m_Buffer = std::make_unique<char[]>(m_pServer->m_iMaxMessageSize);
-			memcpy(m_Buffer.get(), buffer, bufferLen);
-			m_iBufferPos = bufferLen;
+			assert(m_Buffer.empty());
+			m_Buffer.insert(m_Buffer.end(), buffer, buffer + bufferLen);
 		}
 	};
 	
@@ -418,9 +412,7 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		m_bHasCompletedHandshake = true;
 		
-		// Reset buffer, notice that this assumes that the browser won't send anything before
-		// waiting for the header response to come. This line isn't actually needed but it's there for safety
-		m_iBufferPos = 0;
+		m_Buffer.clear();
 		
 		m_pServer->NotifyClientInit(this);
 		
@@ -545,15 +537,12 @@ void Client::OnSocketData(char *data, size_t len){
 				buffer += amount;
 				bufferLen -= amount;
 			}else{
-				memmove(m_Buffer.get(), m_Buffer.get() + amount, m_iBufferPos - amount);
-				m_iBufferPos -= amount;
-				// buffer = m_Buffer.get()
-				bufferLen = m_iBufferPos;
+				m_Buffer.erase(m_Buffer.begin(), m_Buffer.begin() + amount);
+				buffer = m_Buffer.data();
+				bufferLen -= amount;
 				
-				// Used up our class buffer, free it and make sure we crash if we try to use it further in this function
 				if(bufferLen == 0){
-					buffer = nullptr;
-					m_Buffer.reset();
+					m_Buffer.shrink_to_fit();
 				}
 			}
 		}

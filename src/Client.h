@@ -93,8 +93,7 @@ namespace ws28 {
 		
 		size_t m_iCorkCounter = 0;
 		
-		size_t m_iBufferPos = 0;
-		std::unique_ptr<char[]> m_Buffer;
+		std::vector<char> m_Buffer;
 		
 		friend class Server;
 		friend struct detail::Corker;
