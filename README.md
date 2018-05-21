@@ -11,7 +11,7 @@ Maybe.
 
 ## Is it spec compliant?
 
-Mostly. Text messages are handled exactly as binary ones and handed directly to the application, this means no UTF-8 validation. Everything else should be spec compliant.
+Mostly. There's no UTF-8 validation. Everything else should be spec compliant.
 
 ## How do I use this?
 
