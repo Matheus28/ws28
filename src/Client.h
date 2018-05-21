@@ -27,6 +27,7 @@ namespace ws28 {
 	
 	class Server;
 	class Client {
+		enum { MAX_HEADER_SIZE = 10 };
 	public:
 		~Client();
 		
@@ -65,15 +66,18 @@ namespace ws28 {
 		void InitSecure();
 		void FlushTLS();
 		
-		void Write(const char *data){ Write(data, strlen(data)); }
+		void Write(const char *data);
 		void Write(const char *data, size_t len);
-		void WriteRaw(const char *data, size_t len);
+		
+		template<size_t N>
+		void Write(uv_buf_t bufs[N]);
+		
+		template<size_t N>
+		void WriteRaw(uv_buf_t bufs[N]);
+		
 		void WriteRawQueue(std::unique_ptr<char[]> data, size_t len);
 		
 		void Cork(bool v);
-		void ForceCork(bool v);
-		
-		void SendDataFrameHeader(size_t payloadLen, uint8_t opCode);
 		
 		std::unique_ptr<char[]> ToUniqueBuffer(const char *buf, size_t len);
 		
@@ -90,8 +94,6 @@ namespace ws28 {
 		
 		std::unique_ptr<TLS> m_pTLS;
 		std::vector<DataFrame> m_Frames;
-		
-		size_t m_iCorkCounter = 0;
 		
 		std::vector<char> m_Buffer;
 		

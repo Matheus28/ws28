@@ -100,9 +100,7 @@ Client::~Client(){
 void Client::Destroy(){
 	if(!m_Socket) return;
 	
-	// This will permanently uncork our socket
-	++m_iCorkCounter;
-	ForceCork(false);
+	Cork(false);
 	
 	m_Socket->data = nullptr;
 	
@@ -124,6 +122,101 @@ void Client::Destroy(){
 	uv_shutdown(req, (uv_stream_t*) req->socket.get(), [](uv_shutdown_t* reqq, int){
 		delete (ShutdownRequest*) reqq;
 	});
+}
+
+
+
+template<size_t N>
+void Client::WriteRaw(uv_buf_t bufs[N]){
+	if(!m_Socket) return;
+	
+	// Try to write without allocating memory first, if that doesn't work, we call WriteRawQueue
+	int written = uv_try_write((uv_stream_t*) m_Socket.get(), bufs, N);
+	if(written == UV_EAGAIN){
+		for(size_t i = 0; i < N; ++i){
+			auto &buf = bufs[i];
+			WriteRawQueue(ToUniqueBuffer(buf.base, buf.len), buf.len);
+		}
+	}else{
+		if(written >= 0){
+			size_t skipping = (size_t) written;
+			
+			for(size_t i = 0; i < N; ++i){
+				auto &buf = bufs[i];
+				
+				if(skipping >= buf.len){
+					skipping -= buf.len;
+					continue;
+				}
+				
+				WriteRawQueue(ToUniqueBuffer(buf.base + skipping, buf.len - skipping), buf.len - skipping);
+				skipping = 0;
+			}
+		}else{
+			// Write error
+			Destroy();
+			return;
+		}
+	}
+}
+
+void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
+	struct CustomWriteRequest {
+		uv_write_t req;
+		uv_buf_t buf;
+		Client *client;
+		std::unique_ptr<char[]> data;
+	};
+
+	auto request = new CustomWriteRequest();
+	request->buf.base = data.get();
+	request->buf.len = len;
+	request->client = this;
+	request->data = std::move(data);
+	
+	if(uv_write(&request->req, (uv_stream_t*) m_Socket.get(), &request->buf, 1, [](uv_write_t* req, int status){
+		auto request = (CustomWriteRequest*) req;
+
+		if(status < 0){
+			request->client->Destroy();
+		}
+		
+		delete request;
+	}) != 0){
+		delete request;
+		Destroy();
+	}
+}
+
+template<size_t N>
+void Client::Write(uv_buf_t bufs[N]){
+	if(!m_Socket) return;
+	if(IsSecure()){
+		for(size_t i = 0; i < N; ++i){
+			if(!m_pTLS->Write(bufs[i].base, bufs[i].len)) return Destroy();
+		}
+		FlushTLS();
+	}else{
+		WriteRaw<N>(bufs);
+	}
+}
+
+void Client::Write(const char *data, size_t len){
+	uv_buf_t bufs[1];
+	bufs[0].base = (char*) data;
+	bufs[0].len = len;
+	Write<1>(bufs);
+}
+
+void Client::Write(const char *data){
+	Write(data, strlen(data));
+}
+
+
+std::unique_ptr<char[]> Client::ToUniqueBuffer(const char *buf, size_t len){
+	auto d = std::make_unique<char[]>(len);
+	memcpy(d.get(), buf, len);
+	return d;
 }
 
 
@@ -595,9 +688,17 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 			
 			// Copy close message
 			m_bIsClosing = true;
-			detail::Corker corker{*this};
-			SendDataFrameHeader(len, 8);
-			Write(data, len);
+			
+			char header[MAX_HEADER_SIZE];
+			WriteDataFrameHeader(8, len, header);
+			
+			uv_buf_t bufs[2];
+			bufs[0].base = header;
+			bufs[0].len = GetDataFrameHeaderSize(len);
+			bufs[1].base = (char*) data;
+			bufs[1].len = len;
+			
+			Write<2>(bufs);
 			
 			// We always close the tcp connection on our side, as allowed in 7.1.1
 			Destroy();
@@ -626,11 +727,16 @@ void Client::Close(uint16_t code, const char *reason, size_t reasonLen){
 	}else{
 		if(reasonLen == (size_t) -1) reasonLen = strlen(reason);
 		
-		detail::Corker corker{*this};
+		char header[MAX_HEADER_SIZE];
+		WriteDataFrameHeader(8, 2 + reasonLen, header);
 		
-		SendDataFrameHeader(2 + reasonLen, 8);
-		Write(coded, sizeof(coded));
-		Write(reason, reasonLen);
+		uv_buf_t bufs[2];
+		bufs[0].base = header;
+		bufs[0].len = GetDataFrameHeaderSize(2 + reasonLen);
+		bufs[1].base = (char*) reason;
+		bufs[1].len = reasonLen;
+		
+		Write<2>(bufs);
 	}
 	
 	// We always close the tcp connection on our side, as allowed in 7.1.1
@@ -641,119 +747,35 @@ void Client::Close(uint16_t code, const char *reason, size_t reasonLen){
 void Client::Send(const char *data, size_t len, uint8_t opcode){
 	if(!m_Socket) return;
 	
-	detail::Corker corker{*this};
+	char header[MAX_HEADER_SIZE];
+	WriteDataFrameHeader(opcode, len, header);
 	
-	SendDataFrameHeader(len, opcode);
-	Write(data, len);
-}
-
-void Client::SendDataFrameHeader(size_t payloadLen, uint8_t opcode){
-	if(!m_Socket) return;
-	char header[16];
-	WriteDataFrameHeader(opcode, payloadLen, header);
-	Write(header, GetDataFrameHeaderSize(payloadLen));
+	uv_buf_t bufs[2];
+	bufs[0].base = header;
+	bufs[0].len = GetDataFrameHeaderSize(len);
+	bufs[1].base = (char*) data;
+	bufs[1].len = len;
+	
+	Write<2>(bufs);
 }
 
 void Client::InitSecure(){
 	m_pTLS = std::make_unique<TLS>(m_pServer->GetSSLContext());
 }
 
-
 void Client::FlushTLS(){
 	assert(m_pTLS != nullptr);
 	m_pTLS->ForEachPendingWrite([&](const char *data, size_t len){
-		WriteRaw(data, len);
+		uv_buf_t bufs[1];
+		bufs[0].base = (char*) data;
+		bufs[0].len = len;
+		WriteRaw<1>(bufs);
 	});
-}
-
-void Client::Write(const char *data, size_t len){
-	if(!m_Socket) return;
-	if(IsSecure()){
-		if(!m_pTLS->Write(data, len)) return Destroy();
-		FlushTLS();
-	}else{
-		WriteRaw(data, len);
-	}
-}
-
-std::unique_ptr<char[]> Client::ToUniqueBuffer(const char *buf, size_t len){
-	auto d = std::make_unique<char[]>(len);
-	memcpy(d.get(), buf, len);
-	return d;
-}
-
-
-void Client::WriteRaw(const char* data, size_t len){
-	if(!m_Socket) return;
-	if(len == 0) return;
-	
-	// Try to write without allocating memory first, if that doesn't work, we call WriteRawQueue
-	uv_buf_t buf;
-	buf.base = (char*) data;
-	buf.len = len;
-	
-	int written = uv_try_write((uv_stream_t*) m_Socket.get(), &buf, 1);
-	if(written == UV_EAGAIN){
-		WriteRawQueue(ToUniqueBuffer(data, len), len);
-	}else{
-		assert(written != 0);
-		if(written > 0){
-			if((size_t) written == len) return; // <= This should be the common case
-			
-			// Partial write
-			
-			// This is bad, but it should be rare
-			// We need to reallocate the buffer so it gets freed properly
-			// There are better ways to do this, but I'm lazy
-			
-			WriteRawQueue(ToUniqueBuffer(data + written, len - written), len - written);
-		}else{
-			// Write error
-			Destroy();
-			return;
-		}
-	}
-}
-
-void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
-	struct CustomWriteRequest {
-		uv_write_t req;
-		uv_buf_t buf;
-		Client *client;
-		std::unique_ptr<char[]> data;
-	};
-
-	auto request = new CustomWriteRequest();
-	request->buf.base = data.get();
-	request->buf.len = len;
-	request->client = this;
-	request->data = std::move(data);
-	
-	if(uv_write(&request->req, (uv_stream_t*) m_Socket.get(), &request->buf, 1, [](uv_write_t* req, int status){
-		auto request = (CustomWriteRequest*) req;
-
-		if(status < 0){
-			request->client->Destroy();
-		}
-		
-		delete request;
-	}) != 0){
-		delete request;
-		Destroy();
-	}
 }
 
 void Client::Cork(bool v){
 	if(!m_Socket) return;
 	
-	if(v){
-		if(m_iCorkCounter++ == 0) ForceCork(true);
-	}else{
-		if(--m_iCorkCounter == 0) ForceCork(false);
-	}
-}
-	
-void Client::ForceCork(bool v){
 	int enable = v;
 	uv_os_fd_t fd;
 	uv_fileno((uv_handle_t*) m_Socket.get(), &fd);
