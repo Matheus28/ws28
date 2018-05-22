@@ -620,6 +620,7 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		// Clients MUST mask their headers
 		if(!header.mask()) return Close(1002, "Clients must mask their payload");
+		assert(header.mask());
 		
 		char *curPosition = buffer + 2;
 
@@ -641,6 +642,7 @@ void Client::OnSocketData(char *data, size_t len){
 
 		auto amountLeft = bufferLen - (curPosition - buffer);
 		const char *maskKey = nullptr;
+		
 		if(header.mask()){
 			if(amountLeft < 4) return Bail();
 			maskKey = curPosition;
@@ -650,68 +652,49 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		if(frameLength > amountLeft) return Bail();
 		
-		auto Unmask = [&](char *data, size_t len){
-			if(header.mask()){
-				for(size_t i = 0; i < (len & ~3); i += 4){
-					data[i + 0] ^= maskKey[0];
-					data[i + 1] ^= maskKey[1];
-					data[i + 2] ^= maskKey[2];
-					data[i + 3] ^= maskKey[3];
-				}
-				
-				for(size_t i = len & ~3; i < len; ++i){
-					data[i] ^= maskKey[i % 4];
-				} 
+		auto Unmask = [](char *data, size_t len, const char *maskKey){
+			for(size_t i = 0; i < (len & ~3); i += 4){
+				data[i + 0] ^= maskKey[0];
+				data[i + 1] ^= maskKey[1];
+				data[i + 2] ^= maskKey[2];
+				data[i + 3] ^= maskKey[3];
 			}
+			
+			for(size_t i = len & ~3; i < len; ++i){
+				data[i] ^= maskKey[i % 4];
+			} 
 		};
+		
+		if(header.mask()) Unmask((char*) curPosition, frameLength, maskKey);
 		
 		if(header.opcode() >= 0x08){
 			if(!header.fin()) return Close(1002, "Control op codes can't be fragmented");
 			if(frameLength > 125) return Close(1002, "Control op codes can't be more than 125 bytes");
 			
 			
-			Unmask((char*) curPosition, frameLength);
 			ProcessDataFrame(header.opcode(), curPosition, frameLength);
-		}else if(m_Frames.empty() && header.fin()){
+		}else if(!IsBuildingFrames() && header.fin()){
 			// Fast path, we received a whole frame and we don't need to combine it with anything
-			Unmask((char*) curPosition, frameLength);
 			ProcessDataFrame(header.opcode(), curPosition, frameLength);
 		}else{
-			if(m_Frames.empty()){
-				if(header.opcode() == 0) return Close(1002, "Unexpected continuation frame");
-			}else{
+			if(IsBuildingFrames()){
 				if(header.opcode() != 0) return Close(1002, "Expected continuation frame");
+			}else{
+				if(header.opcode() == 0) return Close(1002, "Unexpected continuation frame");
+				m_iFrameOpcode = header.opcode();
 			}
 			
-			{
-				DataFrame frame{ header.opcode(), ToUniqueBuffer(curPosition, frameLength), frameLength };
-				Unmask(frame.data.get(), frame.len);
-				m_Frames.emplace_back(std::move(frame));
-			}
+			if(m_FrameBuffer.size() + frameLength >= m_pServer->m_iMaxMessageSize) return Close(1009, "Message too large");
 			
-			if(m_Frames.size() > m_pServer->m_iMaxMessageFrames) return Close(1009, "Too many frames");
+			m_FrameBuffer.insert(m_FrameBuffer.end(), curPosition, curPosition + frameLength);
 			
-			size_t totalLength = 0;
-			for(DataFrame &frame : m_Frames){
-				totalLength += frame.len;
-			}
-			
-			if(totalLength >= m_pServer->m_iMaxMessageSize) return Close(1009, "Message too large");
-				
 			if(header.fin()){
 				// Assemble frame
 				
-				auto allFrames = std::make_unique<char[]>(totalLength);
+				ProcessDataFrame(m_iFrameOpcode, m_FrameBuffer.data(), m_FrameBuffer.size());
 				
-				size_t allFramesPos = 0;
-				for(DataFrame &frame : m_Frames){
-					memcpy(allFrames.get() + allFramesPos, frame.data.get(), frame.len);
-					allFramesPos += frame.len;
-				}
-
-				ProcessDataFrame(m_Frames[0].opcode, allFrames.get(), totalLength);
-				
-				m_Frames.clear();
+				m_iFrameOpcode = 0;
+				m_FrameBuffer.clear();
 			}
 			
 		}

@@ -94,7 +94,6 @@ namespace ws28 {
 		// Adjusts how much we're willing to accept from clients
 		// Note: this can only be set while we don't have clients (preferably before listening)
 		inline void SetMaxMessageSize(size_t v){ assert(m_Clients.empty()); m_iMaxMessageSize = v;}
-		inline void SetMaxMessageFrames(size_t v){ assert(m_Clients.empty()); m_iMaxMessageFrames = v;}
 		
 	private:
 		void OnConnection(uv_stream_t* server, int status);
@@ -122,7 +121,6 @@ namespace ws28 {
 		HTTPRequestFn m_fnHTTPRequest = nullptr;
 		
 		size_t m_iMaxMessageSize = 16 * 1024;
-		size_t m_iMaxMessageFrames = 32;
 		
 		friend class Client;
 	};

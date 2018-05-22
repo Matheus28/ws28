@@ -28,6 +28,7 @@ namespace ws28 {
 	class Server;
 	class Client {
 		enum { MAX_HEADER_SIZE = 10 };
+		enum : unsigned char { NO_FRAMES = 0 };
 	public:
 		~Client();
 		
@@ -87,6 +88,7 @@ namespace ws28 {
 		// Stub, maybe some day
 		inline bool IsValidUTF8(const char *str, size_t len){ return true; }
 		
+		inline bool IsBuildingFrames(){ return m_iFrameOpcode != NO_FRAMES; }
 		
 		Server *m_pServer;
 		SocketHandle m_Socket;
@@ -97,9 +99,12 @@ namespace ws28 {
 		char m_IP[46];
 		
 		std::unique_ptr<TLS> m_pTLS;
-		std::vector<DataFrame> m_Frames;
 		
 		std::vector<char> m_Buffer;
+		
+		bool m_bBuildingFrames = false;
+		uint8_t m_iFrameOpcode = NO_FRAMES;
+		std::vector<char> m_FrameBuffer;
 		
 		friend class Server;
 		friend struct detail::Corker;

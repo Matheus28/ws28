@@ -20,7 +20,6 @@ int main(){
 	// I recommend against setting these limits, they're way too high and allow easy DDoSes.
 	// Use the default settings. These are just here to pass tests
 	s.SetMaxMessageSize(256 * 1024 * 1024); // 256 MB
-	s.SetMaxMessageFrames(1024 * 1024); // 1 million
 	
 	
 	s.SetClientConnectedCallback([](ws28::Client *client){
