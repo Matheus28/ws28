@@ -211,47 +211,42 @@ void Client::WriteRaw(uv_buf_t bufs[N]){
 	
 	// Try to write without allocating memory first, if that doesn't work, we call WriteRawQueue
 	int written = uv_try_write((uv_stream_t*) m_Socket.get(), bufs, N);
-	if(written == UV_EAGAIN){
+	if(written == UV_EAGAIN) written = 0;
+		
+	if(written >= 0){
+		size_t totalLength = 0;
+		
 		for(size_t i = 0; i < N; ++i){
 			auto &buf = bufs[i];
-			WriteRawQueue(ToUniqueBuffer(buf.base, buf.len), buf.len);
+			totalLength += buf.len;
 		}
+		
+		size_t skipping = (size_t) written;
+		if(skipping == totalLength) return; // Complete write
+		
+		// Partial write
+		// Copy the remainder into a buffer to send to WriteRawQueue
+		
+		auto cpy = std::make_unique<char[]>(totalLength);
+		size_t offset = 0;
+		
+		for(size_t i = 0; i < N; ++i){
+			auto &buf = bufs[i];
+			if(skipping >= buf.len){
+				skipping -= buf.len;
+				continue;
+			}
+			
+			memcpy(cpy.get() + offset, buf.base + skipping, buf.len - skipping);
+			offset += buf.len - skipping;
+			skipping = 0;
+		}
+		
+		WriteRawQueue(std::move(cpy), offset);
 	}else{
-		if(written >= 0){
-			size_t totalLength = 0;
-			
-			for(size_t i = 0; i < N; ++i){
-				auto &buf = bufs[i];
-				totalLength += buf.len;
-			}
-			
-			size_t skipping = (size_t) written;
-			if(skipping == totalLength) return; // Complete write
-			
-			// Partial write
-			// Copy the remainder into a buffer to send to WriteRawQueue
-			
-			auto cpy = std::make_unique<char[]>(totalLength);
-			size_t offset = 0;
-			
-			for(size_t i = 0; i < N; ++i){
-				auto &buf = bufs[i];
-				if(skipping >= buf.len){
-					skipping -= buf.len;
-					continue;
-				}
-				
-				memcpy(cpy.get() + offset, buf.base + skipping, buf.len - skipping);
-				offset += buf.len - skipping;
-				skipping = 0;
-			}
-			
-			WriteRawQueue(std::move(cpy), offset);
-		}else{
-			// Write error
-			Destroy();
-			return;
-		}
+		// Write error
+		Destroy();
+		return;
 	}
 }
 
