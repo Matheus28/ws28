@@ -188,7 +188,7 @@ void Client::Destroy(){
 	
 	m_pServer = nullptr;
 	
-	uv_shutdown(req, (uv_stream_t*) req->socket.get(), [](uv_shutdown_t* reqq, int){
+	auto cb = [](uv_shutdown_t* reqq, int){
 		auto req = (ShutdownRequest*) reqq;
 		
 		if(req->cb && req->client->m_bHasCompletedHandshake){
@@ -196,7 +196,11 @@ void Client::Destroy(){
 		}
 		
 		delete req;
-	});
+	};
+	
+	if(uv_shutdown(req, (uv_stream_t*) req->socket.get(), cb) != 0){
+		cb(req, 0);
+	}
 }
 
 
