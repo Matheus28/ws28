@@ -312,14 +312,6 @@ void Client::Write(const char *data){
 	Write(data, strlen(data));
 }
 
-
-std::unique_ptr<char[]> Client::ToUniqueBuffer(const char *buf, size_t len){
-	auto d = std::make_unique<char[]>(len);
-	memcpy(d.get(), buf, len);
-	return d;
-}
-
-
 void Client::WriteDataFrameHeader(uint8_t opcode, size_t len, char *headerStart){
 	DataFrameHeader header{ headerStart };
 	
@@ -422,8 +414,6 @@ void Client::OnSocketData(char *data, size_t len){
 		buffer = m_Buffer.data();
 		bufferLen = m_Buffer.size();
 	}
-	
-	
 	
 	auto Bail = [&](){
 		// Copy partial HTTP headers to our buffer
@@ -652,7 +642,7 @@ void Client::OnSocketData(char *data, size_t len){
 		auto amountLeft = bufferLen - (curPosition - buffer);
 		const char *maskKey = nullptr;
 		
-		if(header.mask()){
+		{ // Read mask
 			if(amountLeft < 4) return Bail();
 			maskKey = curPosition;
 			curPosition += 4;
@@ -661,20 +651,18 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		if(frameLength > amountLeft) return Bail();
 		
-		auto Unmask = [](char *data, size_t len, const char *maskKey){
-			for(size_t i = 0; i < (len & ~3); i += 4){
-				data[i + 0] ^= maskKey[0];
-				data[i + 1] ^= maskKey[1];
-				data[i + 2] ^= maskKey[2];
-				data[i + 3] ^= maskKey[3];
+		{ // Unmask
+			for(size_t i = 0; i < (frameLength & ~3); i += 4){
+				curPosition[i + 0] ^= maskKey[0];
+				curPosition[i + 1] ^= maskKey[1];
+				curPosition[i + 2] ^= maskKey[2];
+				curPosition[i + 3] ^= maskKey[3];
 			}
 			
-			for(size_t i = len & ~3; i < len; ++i){
-				data[i] ^= maskKey[i % 4];
+			for(size_t i = frameLength & ~3; i < frameLength; ++i){
+				curPosition[i] ^= maskKey[i % 4];
 			} 
-		};
-		
-		if(header.mask()) Unmask((char*) curPosition, frameLength, maskKey);
+		}
 		
 		if(header.opcode() >= 0x08){
 			if(!header.fin()) return Close(1002, "Control op codes can't be fragmented");
@@ -732,13 +720,16 @@ void Client::OnSocketData(char *data, size_t len){
 
 
 void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
-	if(opcode == 9){
+	switch(opcode){
+	case 9:
 		if(m_bIsClosing) return;
 		// Ping
 		Send(data, len, 10); // Send Pong
-	}else if(opcode == 10){
-		// Pong
-	}else if(opcode == 8){
+	break;
+	
+	case 10: break; // Pong
+	
+	case 8:
 		// Close
 		if(m_bIsClosing){
 			Destroy();
@@ -789,12 +780,17 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 			// We always close the tcp connection on our side, as allowed in 7.1.1
 			Destroy();
 		}
-	}else if(opcode == 1 || opcode == 2){
+	break;
+	
+	case 1:
+	case 2:
 		if(m_bIsClosing) return;
 		if(opcode == 1 && !IsValidUTF8(data, len)) return Close(1007, "Invalid UTF-8 in text frame");
 		
 		m_pServer->NotifyClientData(this, data, len, opcode);
-	}else{
+	break;
+	
+	default:
 		return Close(1002, "Unknown op code");
 	}
 }

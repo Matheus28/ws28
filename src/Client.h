@@ -83,8 +83,6 @@ namespace ws28 {
 		
 		void Cork(bool v);
 		
-		std::unique_ptr<char[]> ToUniqueBuffer(const char *buf, size_t len);
-		
 		// Stub, maybe some day
 		inline bool IsValidUTF8(const char *str, size_t len){ return true; }
 		
