@@ -102,7 +102,6 @@ namespace ws28 {
 		
 		std::vector<char> m_Buffer;
 		
-		bool m_bBuildingFrames = false;
 		uint8_t m_iFrameOpcode = NO_FRAMES;
 		std::vector<char> m_FrameBuffer;
 		
