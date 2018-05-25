@@ -251,6 +251,8 @@ void Client::WriteRaw(uv_buf_t bufs[N]){
 }
 
 void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
+	if(!m_Socket) return;
+	
 	struct CustomWriteRequest {
 		uv_write_t req;
 		uv_buf_t buf;
