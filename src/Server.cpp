@@ -83,7 +83,11 @@ void Server::OnConnection(uv_stream_t* server, int status){
 	socket->data = nullptr;
 
 	if(uv_accept(server, (uv_stream_t*) socket.get()) == 0){
-		m_Clients.emplace_back(new Client(this, std::move(socket)));
+		auto client = new Client(this, std::move(socket));
+		m_Clients.emplace_back(client);
+		
+		// If for whatever reason uv_tcp_getpeername failed (happens... somehow?)
+		if(client->GetIP()[0] == '\0') client->Destroy();
 	}
 }
 

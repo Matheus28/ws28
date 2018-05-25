@@ -137,7 +137,7 @@ Client::Client(Server *server, SocketHandle socket) : m_pServer(server), m_Socke
 				memmove(m_IP, m_IP + strlen(ipv4Prefix), strlen(m_IP) - strlen(ipv4Prefix) + 1);
 			}
 		}else{
-			assert(false);
+			// Server::OnConnection will destroy us
 		}
 	}
 	
