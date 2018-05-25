@@ -28,7 +28,7 @@ bool Server::Listen(int port, bool ipv4Only){
 #endif
 	
 	auto server = SocketHandle{new uv_tcp_t};
-	uv_tcp_init(m_pLoop, server.get());
+	uv_tcp_init_ex(m_pLoop, server.get(), ipv4Only ? AF_INET : AF_INET6);
 	server->data = this;
 	
 	struct sockaddr_storage addr;
@@ -40,6 +40,14 @@ bool Server::Listen(int port, bool ipv4Only){
 	}
 	
 	uv_tcp_nodelay(server.get(), (int) true);
+	
+	// Enable SO_REUSEPORT
+#ifndef _WIN32
+	uv_os_fd_t fd;
+	assert(uv_fileno((uv_handle_t*) server.get(), &fd) == 0);
+    int optval = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+#endif
 	
 	if(uv_tcp_bind(server.get(), (struct sockaddr*) &addr, 0) != 0){
 		return false;
