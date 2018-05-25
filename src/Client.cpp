@@ -201,7 +201,7 @@ void Client::Destroy(){
 	if(uv_shutdown(req, (uv_stream_t*) req->socket.get(), cb) != 0){
 		// Shutdown failed, but we have to delay the destruction to the next event loop
 		auto timer = new uv_timer_t;
-		uv_timer_init(m_Socket->loop, timer);
+		uv_timer_init(req->socket->loop, timer);
 		timer->data = req;
 		uv_timer_start(timer, [](uv_timer_t *timer){
 			auto req = (ShutdownRequest*) timer->data;
