@@ -188,7 +188,7 @@ void Client::Destroy(){
 	
 	m_pServer = nullptr;
 	
-	auto cb = [](uv_shutdown_t* reqq, int){
+	static auto cb = [](uv_shutdown_t* reqq, int){
 		auto req = (ShutdownRequest*) reqq;
 		
 		if(req->cb && req->client->m_bHasCompletedHandshake){
@@ -199,7 +199,15 @@ void Client::Destroy(){
 	};
 	
 	if(uv_shutdown(req, (uv_stream_t*) req->socket.get(), cb) != 0){
-		cb(req, 0);
+		// Shutdown failed, but we have to delay the destruction to the next event loop
+		auto timer = new uv_timer_t;
+		uv_timer_init(m_Socket->loop, timer);
+		timer->data = req;
+		uv_timer_start(timer, [](uv_timer_t *timer){
+			auto req = (ShutdownRequest*) timer->data;
+			cb(req, 0);
+			uv_close((uv_handle_t*) timer, [](uv_handle_t *h){ delete (uv_timer_t*) h;});
+		}, 0, 0);
 	}
 }
 
