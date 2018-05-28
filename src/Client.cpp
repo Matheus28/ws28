@@ -170,9 +170,6 @@ void Client::Destroy(){
 	
 	m_Socket->data = nullptr;
 	
-	// Remove socket from our object, we'll put it in the shutdown request soon
-	SocketHandle tmp = std::move(m_Socket);
-	
 	auto myself = m_pServer->NotifyClientPreDestroyed(this);
 	
 	struct ShutdownRequest : uv_shutdown_t {
@@ -182,7 +179,7 @@ void Client::Destroy(){
 	};
 	
 	auto req = new ShutdownRequest();
-	req->socket = std::move(tmp);
+	req->socket = std::move(m_Socket);
 	req->client = std::move(myself);
 	req->cb = m_pServer->m_fnClientDisconnected;
 	
