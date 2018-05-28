@@ -95,6 +95,9 @@ namespace ws28 {
 		// Note: this can only be set while we don't have clients (preferably before listening)
 		inline void SetMaxMessageSize(size_t v){ assert(m_Clients.empty()); m_iMaxMessageSize = v;}
 		
+		void Ref(){ if(m_Server) uv_ref((uv_handle_t*) m_Server.get()); }
+		void Unref(){ if(m_Server) uv_unref((uv_handle_t*) m_Server.get()); }
+		
 	private:
 		void OnConnection(uv_stream_t* server, int status);
 		
