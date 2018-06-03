@@ -717,16 +717,14 @@ void Client::OnSocketData(char *data, size_t len){
 
 void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 	switch(opcode){
-	case 9:
+	case 9: // Ping
 		if(m_bIsClosing) return;
-		// Ping
 		Send(data, len, 10); // Send Pong
 	break;
 	
 	case 10: break; // Pong
 	
-	case 8:
-		// Close
+	case 8: // Close
 		if(m_bIsClosing){
 			Destroy();
 		}else{
@@ -778,8 +776,8 @@ void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
 		}
 	break;
 	
-	case 1:
-	case 2:
+	case 1: // Text
+	case 2: // Binary
 		if(m_bIsClosing) return;
 		if(opcode == 1 && !IsValidUTF8(data, len)) return Close(1007, "Invalid UTF-8 in text frame");
 		
