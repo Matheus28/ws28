@@ -22,7 +22,6 @@ namespace detail {
 	bool equalsi(const char *a, const char *b, size_t n){
 		while(n--){
 			if(tolower(*a) != tolower(*b)) return false;
-			if(!*a) return true;
 			
 			++a;
 			++b;
