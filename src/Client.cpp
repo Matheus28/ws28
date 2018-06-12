@@ -596,7 +596,7 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		m_Buffer.clear();
 		
-		m_pServer->NotifyClientInit(this);
+		m_pServer->NotifyClientInit(this, req);
 		
 		return;
 	}

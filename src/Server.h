@@ -43,7 +43,7 @@ namespace ws28 {
 	
 	class Server {
 		typedef bool (*CheckConnectionFn)(HTTPRequest&);
-		typedef void (*ClientConnectedFn)(Client *);
+		typedef void (*ClientConnectedFn)(Client *, HTTPRequest&);
 		typedef void (*ClientDisconnectedFn)(Client *);
 		typedef void (*ClientDataFn)(Client *, const char *data, size_t len, int opcode);
 		typedef void (*HTTPRequestFn)(HTTPRequest&, HTTPResponse&);
@@ -101,8 +101,8 @@ namespace ws28 {
 	private:
 		void OnConnection(uv_stream_t* server, int status);
 		
-		void NotifyClientInit(Client *client){
-			if(m_fnClientConnected) m_fnClientConnected(client);
+		void NotifyClientInit(Client *client, HTTPRequest &req){
+			if(m_fnClientConnected) m_fnClientConnected(client, req);
 		}
 		
 		std::unique_ptr<Client> NotifyClientPreDestroyed(Client *client);

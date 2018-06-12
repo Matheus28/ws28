@@ -22,7 +22,7 @@ int main(){
 	s.SetMaxMessageSize(256 * 1024 * 1024); // 256 MB
 	
 	
-	s.SetClientConnectedCallback([](ws28::Client *client){
+	s.SetClientConnectedCallback([](ws28::Client *client, ws28::HTTPRequest &){
 		client->SetUserData((void*) ++userID);
 		//printf("Client %d connected\n", (int) userID);
 	});
