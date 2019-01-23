@@ -411,6 +411,21 @@ void Client::OnSocketData(char *data, size_t len){
 		bufferLen = m_Buffer.size();
 	}
 	
+	auto Consume = [&](size_t amount){
+		if(usingLocalBuffer){
+			buffer += amount;
+			bufferLen -= amount;
+		}else{
+			m_Buffer.erase(m_Buffer.begin(), m_Buffer.begin() + amount);
+			buffer = m_Buffer.data();
+			bufferLen -= amount;
+			
+			if(bufferLen == 0){
+				m_Buffer.shrink_to_fit();
+			}
+		}
+	};
+	
 	auto Bail = [&](){
 		// Copy partial HTTP headers to our buffer
 		if(usingLocalBuffer && bufferLen > 0){
@@ -419,7 +434,22 @@ void Client::OnSocketData(char *data, size_t len){
 		}
 	};
 	
-	if(!m_bHasCompletedHandshake){
+	if(!m_bHasCompletedHandshake && m_pServer->GetAllowAlternativeProtocol() && buffer[0] == 0x00){
+		m_bHasCompletedHandshake = true;
+		m_bUsingAlternativeProtocol = true;
+		Consume(1);
+		
+		RequestHeaders headers;
+		HTTPRequest req{
+			m_pServer,
+			"GET",
+			"/",
+			m_IP,
+			headers,
+		};
+		
+		m_pServer->NotifyClientInit(this, req);
+	}else if(!m_bHasCompletedHandshake){
 		// HTTP headers not done yet, wait
 		if(strstr((char*)buffer, "\r\n\r\n") == nullptr) return Bail();
 		
@@ -606,108 +636,102 @@ void Client::OnSocketData(char *data, size_t len){
 	for(;;){
 		if(!m_Socket) return; // No need to destroy even
 		
-		// Not enough to read the header
-		if(bufferLen < 2) return Bail();
-		
-		DataFrameHeader header(buffer);
-		
-		if(header.rsv1() || header.rsv2() || header.rsv3()) return Close(1002, "Reserved bit used");
-		
-		// Clients MUST mask their headers
-		if(!header.mask()) return Close(1002, "Clients must mask their payload");
-		assert(header.mask());
-		
-		char *curPosition = buffer + 2;
-
-		size_t frameLength = header.len();
-		if(frameLength == 126){
+		if(m_bUsingAlternativeProtocol){
 			if(bufferLen < 4) return Bail();
-			frameLength = (*(uint8_t*)(curPosition) << 8) | (*(uint8_t*)(curPosition + 1));
-			curPosition += 2;
-		}else if(frameLength == 127){
-			if(bufferLen < 10) return Bail();
+			uint32_t frameLength = ((uint32_t)(uint8_t) buffer[0]) | ((uint32_t)(uint8_t) buffer[1] << 8) | ((uint32_t)(uint8_t) buffer[2] << 16) | ((uint32_t)(uint8_t) buffer[3] << 24);
+			if(frameLength > 1 * 1024 * 1024) return Close(1002, "Too large");
+			if(bufferLen < 4 + frameLength) return Bail();
+			
+			ProcessDataFrame(2, buffer + 4, frameLength);
+			Consume(4 + frameLength);
+		}else{ // Websockets
+			// Not enough to read the header
+			if(bufferLen < 2) return Bail();
+			
+			DataFrameHeader header(buffer);
+			
+			if(header.rsv1() || header.rsv2() || header.rsv3()) return Close(1002, "Reserved bit used");
+			
+			// Clients MUST mask their headers
+			if(!header.mask()) return Close(1002, "Clients must mask their payload");
+			assert(header.mask());
+			
+			char *curPosition = buffer + 2;
 
-			frameLength = ((uint64_t)*(uint8_t*)(curPosition) << 56) | ((uint64_t)*(uint8_t*)(curPosition + 1) << 48)
-				| ((uint64_t)*(uint8_t*)(curPosition + 2) << 40) | ((uint64_t)*(uint8_t*)(curPosition + 3) << 32)
-				| (*(uint8_t*)(curPosition + 4) << 24) | (*(uint8_t*)(curPosition + 5) << 16)
-				| (*(uint8_t*)(curPosition + 6) << 8) | (*(uint8_t*)(curPosition + 7) << 0);
+			size_t frameLength = header.len();
+			if(frameLength == 126){
+				if(bufferLen < 4) return Bail();
+				frameLength = (*(uint8_t*)(curPosition) << 8) | (*(uint8_t*)(curPosition + 1));
+				curPosition += 2;
+			}else if(frameLength == 127){
+				if(bufferLen < 10) return Bail();
 
-			curPosition += 8;
-		}
+				frameLength = ((uint64_t)*(uint8_t*)(curPosition) << 56) | ((uint64_t)*(uint8_t*)(curPosition + 1) << 48)
+					| ((uint64_t)*(uint8_t*)(curPosition + 2) << 40) | ((uint64_t)*(uint8_t*)(curPosition + 3) << 32)
+					| (*(uint8_t*)(curPosition + 4) << 24) | (*(uint8_t*)(curPosition + 5) << 16)
+					| (*(uint8_t*)(curPosition + 6) << 8) | (*(uint8_t*)(curPosition + 7) << 0);
 
-		auto amountLeft = bufferLen - (curPosition - buffer);
-		const char *maskKey = nullptr;
-		
-		{ // Read mask
-			if(amountLeft < 4) return Bail();
-			maskKey = curPosition;
-			curPosition += 4;
-			amountLeft -= 4;
-		}
-		
-		if(frameLength > amountLeft) return Bail();
-		
-		{ // Unmask
-			for(size_t i = 0; i < (frameLength & ~3); i += 4){
-				curPosition[i + 0] ^= maskKey[0];
-				curPosition[i + 1] ^= maskKey[1];
-				curPosition[i + 2] ^= maskKey[2];
-				curPosition[i + 3] ^= maskKey[3];
+				curPosition += 8;
+			}
+
+			auto amountLeft = bufferLen - (curPosition - buffer);
+			const char *maskKey = nullptr;
+			
+			{ // Read mask
+				if(amountLeft < 4) return Bail();
+				maskKey = curPosition;
+				curPosition += 4;
+				amountLeft -= 4;
 			}
 			
-			for(size_t i = frameLength & ~3; i < frameLength; ++i){
-				curPosition[i] ^= maskKey[i % 4];
-			} 
-		}
-		
-		if(header.opcode() >= 0x08){
-			if(!header.fin()) return Close(1002, "Control op codes can't be fragmented");
-			if(frameLength > 125) return Close(1002, "Control op codes can't be more than 125 bytes");
+			if(frameLength > amountLeft) return Bail();
 			
-			
-			ProcessDataFrame(header.opcode(), curPosition, frameLength);
-		}else if(!IsBuildingFrames() && header.fin()){
-			// Fast path, we received a whole frame and we don't need to combine it with anything
-			ProcessDataFrame(header.opcode(), curPosition, frameLength);
-		}else{
-			if(IsBuildingFrames()){
-				if(header.opcode() != 0) return Close(1002, "Expected continuation frame");
-			}else{
-				if(header.opcode() == 0) return Close(1002, "Unexpected continuation frame");
-				m_iFrameOpcode = header.opcode();
-			}
-			
-			if(m_FrameBuffer.size() + frameLength >= m_pServer->m_iMaxMessageSize) return Close(1009, "Message too large");
-			
-			m_FrameBuffer.insert(m_FrameBuffer.end(), curPosition, curPosition + frameLength);
-			
-			if(header.fin()){
-				// Assemble frame
-				
-				ProcessDataFrame(m_iFrameOpcode, m_FrameBuffer.data(), m_FrameBuffer.size());
-				
-				m_iFrameOpcode = 0;
-				m_FrameBuffer.clear();
-			}
-			
-		}
-		
-		// Consume buffer
-		{
-			size_t amount = (curPosition - buffer) + frameLength;
-			
-			if(usingLocalBuffer){
-				buffer += amount;
-				bufferLen -= amount;
-			}else{
-				m_Buffer.erase(m_Buffer.begin(), m_Buffer.begin() + amount);
-				buffer = m_Buffer.data();
-				bufferLen -= amount;
-				
-				if(bufferLen == 0){
-					m_Buffer.shrink_to_fit();
+			{ // Unmask
+				for(size_t i = 0; i < (frameLength & ~3); i += 4){
+					curPosition[i + 0] ^= maskKey[0];
+					curPosition[i + 1] ^= maskKey[1];
+					curPosition[i + 2] ^= maskKey[2];
+					curPosition[i + 3] ^= maskKey[3];
 				}
+				
+				for(size_t i = frameLength & ~3; i < frameLength; ++i){
+					curPosition[i] ^= maskKey[i % 4];
+				} 
 			}
+			
+			if(header.opcode() >= 0x08){
+				if(!header.fin()) return Close(1002, "Control op codes can't be fragmented");
+				if(frameLength > 125) return Close(1002, "Control op codes can't be more than 125 bytes");
+				
+				
+				ProcessDataFrame(header.opcode(), curPosition, frameLength);
+			}else if(!IsBuildingFrames() && header.fin()){
+				// Fast path, we received a whole frame and we don't need to combine it with anything
+				ProcessDataFrame(header.opcode(), curPosition, frameLength);
+			}else{
+				if(IsBuildingFrames()){
+					if(header.opcode() != 0) return Close(1002, "Expected continuation frame");
+				}else{
+					if(header.opcode() == 0) return Close(1002, "Unexpected continuation frame");
+					m_iFrameOpcode = header.opcode();
+				}
+				
+				if(m_FrameBuffer.size() + frameLength >= m_pServer->m_iMaxMessageSize) return Close(1009, "Message too large");
+				
+				m_FrameBuffer.insert(m_FrameBuffer.end(), curPosition, curPosition + frameLength);
+				
+				if(header.fin()){
+					// Assemble frame
+					
+					ProcessDataFrame(m_iFrameOpcode, m_FrameBuffer.data(), m_FrameBuffer.size());
+					
+					m_iFrameOpcode = 0;
+					m_FrameBuffer.clear();
+				}
+				
+			}
+			
+			Consume((curPosition - buffer) + frameLength);
 		}
 	}
 	
@@ -794,25 +818,27 @@ void Client::Close(uint16_t code, const char *reason, size_t reasonLen){
 	
 	m_bIsClosing = true;
 	
-	char coded[2];
-	coded[0] = (code >> 8) & 0xFF;
-	coded[1] = (code >> 0) & 0xFF;
-	
-	if(reason == nullptr){
-		Send(coded, sizeof(coded), 8);
-	}else{
-		if(reasonLen == (size_t) -1) reasonLen = strlen(reason);
+	if(!m_bUsingAlternativeProtocol){
+		char coded[2];
+		coded[0] = (code >> 8) & 0xFF;
+		coded[1] = (code >> 0) & 0xFF;
 		
-		char header[MAX_HEADER_SIZE];
-		WriteDataFrameHeader(8, 2 + reasonLen, header);
-		
-		uv_buf_t bufs[2];
-		bufs[0].base = header;
-		bufs[0].len = GetDataFrameHeaderSize(2 + reasonLen);
-		bufs[1].base = (char*) reason;
-		bufs[1].len = reasonLen;
-		
-		Write<2>(bufs);
+		if(reason == nullptr){
+			Send(coded, sizeof(coded), 8);
+		}else{
+			if(reasonLen == (size_t) -1) reasonLen = strlen(reason);
+			
+			char header[MAX_HEADER_SIZE];
+			WriteDataFrameHeader(8, 2 + reasonLen, header);
+			
+			uv_buf_t bufs[2];
+			bufs[0].base = header;
+			bufs[0].len = GetDataFrameHeaderSize(2 + reasonLen);
+			bufs[1].base = (char*) reason;
+			bufs[1].len = reasonLen;
+			
+			Write<2>(bufs);
+		}
 	}
 	
 	// We always close the tcp connection on our side, as allowed in 7.1.1
@@ -823,16 +849,33 @@ void Client::Close(uint16_t code, const char *reason, size_t reasonLen){
 void Client::Send(const char *data, size_t len, uint8_t opcode){
 	if(!m_Socket) return;
 	
-	char header[MAX_HEADER_SIZE];
-	WriteDataFrameHeader(opcode, len, header);
-	
-	uv_buf_t bufs[2];
-	bufs[0].base = header;
-	bufs[0].len = GetDataFrameHeaderSize(len);
-	bufs[1].base = (char*) data;
-	bufs[1].len = len;
-	
-	Write<2>(bufs);
+	if(m_bUsingAlternativeProtocol){
+		uint32_t len32 = (uint32_t) len;
+		uint8_t header[4];
+		header[0] = (len32 >>  0) & 0xFF;
+		header[1] = (len32 >>  8) & 0xFF;
+		header[2] = (len32 >> 16) & 0xFF;
+		header[3] = (len32 >> 24) & 0xFF;
+		
+		uv_buf_t bufs[2];
+		bufs[0].base = (char*) header;
+		bufs[0].len = 4;
+		bufs[1].base = (char*) data;
+		bufs[1].len = len;
+		
+		Write<2>(bufs);
+	}else{
+		char header[MAX_HEADER_SIZE];
+		WriteDataFrameHeader(opcode, len, header);
+		
+		uv_buf_t bufs[2];
+		bufs[0].base = header;
+		bufs[0].len = GetDataFrameHeaderSize(len);
+		bufs[1].base = (char*) data;
+		bufs[1].len = len;
+		
+		Write<2>(bufs);
+	}
 }
 
 void Client::InitSecure(){

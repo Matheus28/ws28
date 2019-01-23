@@ -95,6 +95,13 @@ namespace ws28 {
 		// Note: this can only be set while we don't have clients (preferably before listening)
 		inline void SetMaxMessageSize(size_t v){ assert(m_Clients.empty()); m_iMaxMessageSize = v;}
 		
+		// Alternative protocol means that the client sends a 0x00, and we skip all websocket protocol
+		// This means clients don't call CheckConnection, and they receive an empty request header in the connection callback
+		// Opcode is always binary
+		// In the alternative protocol, clients and servers send the packet length as a Little Endian uint32, then its contents
+		inline void SetAllowAlternativeProtocol(bool v){ m_bAllowAlternativeProtocol = v; }
+		inline bool GetAllowAlternativeProtocol(){ return m_bAllowAlternativeProtocol; }
+		
 		void Ref(){ if(m_Server) uv_ref((uv_handle_t*) m_Server.get()); }
 		void Unref(){ if(m_Server) uv_unref((uv_handle_t*) m_Server.get()); }
 		
@@ -116,6 +123,7 @@ namespace ws28 {
 		SSL_CTX *m_pSSLContext;
 		void *m_pUserData = nullptr;
 		std::vector<std::unique_ptr<Client>> m_Clients;
+		bool m_bAllowAlternativeProtocol = false;
 		
 		CheckConnectionFn m_fnCheckConnection = nullptr;
 		ClientConnectedFn m_fnClientConnected = nullptr;

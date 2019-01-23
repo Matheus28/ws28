@@ -41,6 +41,7 @@ namespace ws28 {
 		inline void* GetUserData(){ return m_pUserData; }
 		
 		inline bool IsSecure(){ return m_pTLS != nullptr; }
+		inline bool IsUsingAlternativeProtocol(){ return m_bUsingAlternativeProtocol; }
 		
 		inline Server* GetServer(){ return m_pServer; }
 		
@@ -94,6 +95,7 @@ namespace ws28 {
 		bool m_bWaitingForFirstPacket = true;
 		bool m_bHasCompletedHandshake = false;
 		bool m_bIsClosing = false;
+		bool m_bUsingAlternativeProtocol = false;
 		char m_IP[46];
 		
 		std::unique_ptr<TLS> m_pTLS;
