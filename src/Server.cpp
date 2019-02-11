@@ -46,8 +46,8 @@ bool Server::Listen(int port, bool ipv4Only){
 	uv_os_fd_t fd;
 	int r = uv_fileno((uv_handle_t*) server.get(), &fd);
 	assert(r == 0);
-    int optval = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+	int optval = 1;
+	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
 #endif
 	
 	if(uv_tcp_bind(server.get(), (struct sockaddr*) &addr, 0) != 0){
