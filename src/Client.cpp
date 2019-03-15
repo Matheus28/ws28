@@ -126,9 +126,13 @@ Client::Client(Server *server, SocketHandle socket) : m_pServer(server), m_Socke
 		uv_tcp_getpeername(m_Socket.get(), (sockaddr*) &addr, &addrLen);
 		
 		if(addr.ss_family == AF_INET){
-			assert(uv_ip4_name((sockaddr_in*) &addr, m_IP, sizeof(m_IP)) == 0);
+			int r = uv_ip4_name((sockaddr_in*) &addr, m_IP, sizeof(m_IP));
+			(void) r;
+			assert(r == 0);
 		}else if(addr.ss_family == AF_INET6){
-			assert(uv_ip6_name((sockaddr_in6*) &addr, m_IP, sizeof(m_IP)) == 0);
+			int r = uv_ip6_name((sockaddr_in6*) &addr, m_IP, sizeof(m_IP));
+			(void) r;
+			assert(r == 0);
 			
 			// Remove this prefix if it exists, it means that we actually have a ipv4
 			static const char *ipv4Prefix = "::ffff:";
