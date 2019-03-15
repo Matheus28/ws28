@@ -263,18 +263,19 @@ void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
 	
 	struct CustomWriteRequest {
 		uv_write_t req;
-		uv_buf_t buf;
 		Client *client;
 		std::unique_ptr<char[]> data;
 	};
+	
+	uv_buf_t buf;
+	buf.base = data.get();
+	buf.len = len;
 
 	auto request = new CustomWriteRequest();
-	request->buf.base = data.get();
-	request->buf.len = len;
 	request->client = this;
 	request->data = std::move(data);
 	
-	if(uv_write(&request->req, (uv_stream_t*) m_Socket.get(), &request->buf, 1, [](uv_write_t* req, int status){
+	if(uv_write(&request->req, (uv_stream_t*) m_Socket.get(), &buf, 1, [](uv_write_t* req, int status){
 		auto request = (CustomWriteRequest*) req;
 
 		if(status < 0){
