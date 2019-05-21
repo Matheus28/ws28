@@ -118,6 +118,7 @@ Client::Client(Server *server, SocketHandle socket) : m_pServer(server), m_Socke
 	
 	// Default to true since that's what most people want
 	uv_tcp_nodelay(m_Socket.get(), true);
+	uv_tcp_keepalive(m_Socket.get(), true, 10000);
 	
 	{ // Put IP in m_IP
 		m_IP[0] = '\0';
@@ -385,6 +386,8 @@ void Client::OnRawSocketData(char *data, size_t len){
 }
 
 void Client::OnSocketData(char *data, size_t len){
+	if(m_pServer == nullptr) return;
+	
 	// This gives us an extra byte just in case
 	if(m_Buffer.size() + len + 1 >= m_pServer->m_iMaxMessageSize){
 		if(m_bHasCompletedHandshake){
@@ -900,6 +903,8 @@ void Client::FlushTLS(){
 void Client::Cork(bool v){
 	if(!m_Socket) return;
 	
+#if defined(TCP_CORK) || defined(TCP_NOPUSH)
+	
 	int enable = v;
 	uv_os_fd_t fd;
 	uv_fileno((uv_handle_t*) m_Socket.get(), &fd);
@@ -916,6 +921,8 @@ void Client::Cork(bool v){
 	if(!enable){
 		::send(fd, "", 0, 0);
 	}
+#endif
+	
 #endif
 }
 
