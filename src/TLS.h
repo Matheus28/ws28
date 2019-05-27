@@ -129,7 +129,7 @@ private:
 		
 		while(!m_EncryptBuf.empty()){
 			ERR_clear_error();
-			n = SSL_write(m_SSL, m_EncryptBuf.data(), m_EncryptBuf.size());
+			n = SSL_write(m_SSL, m_EncryptBuf.data(), (int) m_EncryptBuf.size());
 			
 			if(GetSSLStatus(n) == SSLSTATUS_FAIL) return false;
 			
