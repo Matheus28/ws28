@@ -62,7 +62,7 @@ namespace ws28 {
 		
 		template<typename F>
 		void ForEachValueOf(const char *key, const F &f) const {
-			#define X(str, variable) if(strcmp(key, str) == 0){ f(variable); return;}
+			#define X(str, variable) if(strcmp(key, str) == 0 && variable != nullptr){ f(variable); return;}
 			XX
 			#undef X
 			
