@@ -105,7 +105,8 @@ std::unique_ptr<Client> Server::NotifyClientPreDestroyed(Client *client){
 	for(auto it = m_Clients.begin(); it != m_Clients.end(); ++it){
 		if(it->get() == client){
 			std::unique_ptr<Client> r = std::move(*it);
-			m_Clients.erase(it);
+			*it = std::move(m_Clients.back());
+			m_Clients.pop_back();
 			return r;
 		}
 	}
