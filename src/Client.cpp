@@ -368,7 +368,15 @@ void Client::OnRawSocketData(char *data, size_t len){
 		assert(!IsSecure());
 		
 		if(m_pServer->GetSSLContext() != nullptr && (data[0] == 0x16 || uint8_t(data[0]) == 0x80)){
+			if(m_pServer->m_fnCheckTCPConnection && !m_pServer->m_fnCheckTCPConnection(GetIP(), true)){
+				return Destroy();
+			}
+			
 			InitSecure();
+		}else{
+			if(m_pServer->m_fnCheckTCPConnection && !m_pServer->m_fnCheckTCPConnection(GetIP(), false)){
+				return Destroy();
+			}
 		}
 	}
 	

@@ -42,6 +42,7 @@ namespace ws28 {
 	};
 	
 	class Server {
+		typedef bool (*CheckTCPConnectionFn)(const char *ip, bool secure);
 		typedef bool (*CheckConnectionFn)(HTTPRequest&);
 		typedef void (*ClientConnectedFn)(Client *, HTTPRequest&);
 		typedef void (*ClientDisconnectedFn)(Client *);
@@ -60,6 +61,11 @@ namespace ws28 {
 		bool Listen(int port, bool ipv4Only = false);
 		void StopListening();
 		void DestroyClients();
+		
+		// This callback is called when the client is trying to connect using websockets
+		// By default, for safety, this checks the Origin and makes sure it matches the Host
+		// It's likely you wanna change this check if your websocket server is in a different domain.
+		void SetCheckTCPConnectionCallback(CheckTCPConnectionFn v){ m_fnCheckTCPConnection = v; }
 		
 		// This callback is called when the client is trying to connect using websockets
 		// By default, for safety, this checks the Origin and makes sure it matches the Host
@@ -125,6 +131,7 @@ namespace ws28 {
 		std::vector<std::unique_ptr<Client>> m_Clients;
 		bool m_bAllowAlternativeProtocol = false;
 		
+		CheckTCPConnectionFn m_fnCheckTCPConnection = nullptr;
 		CheckConnectionFn m_fnCheckConnection = nullptr;
 		ClientConnectedFn m_fnClientConnected = nullptr;
 		ClientDisconnectedFn m_fnClientDisconnected = nullptr;
