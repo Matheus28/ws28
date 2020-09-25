@@ -62,9 +62,8 @@ namespace ws28 {
 		void StopListening();
 		void DestroyClients();
 		
-		// This callback is called when the client is trying to connect using websockets
-		// By default, for safety, this checks the Origin and makes sure it matches the Host
-		// It's likely you wanna change this check if your websocket server is in a different domain.
+		// This callback is called when we know whether a TCP connection wants a secure connection or not,
+		// once we receive the very first byte from the client
 		void SetCheckTCPConnectionCallback(CheckTCPConnectionFn v){ m_fnCheckTCPConnection = v; }
 		
 		// This callback is called when the client is trying to connect using websockets
