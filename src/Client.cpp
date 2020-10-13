@@ -524,8 +524,10 @@ void Client::OnSocketData(char *data, size_t len){
 			auto keyEnd = colonPos;
 			
 			// Key to lower case
-			std::transform(keyStart, keyEnd, keyStart, ::tolower);
-			
+			std::transform(keyStart, keyEnd, keyStart, [](char v) -> char {
+				if(v < 0 || v >= 127) return v;
+				return tolower(v);
+			});
 			
 			auto valueStart = colonPos + 1;
 			auto valueEnd = nextLine;
