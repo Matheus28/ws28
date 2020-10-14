@@ -556,8 +556,8 @@ void Client::OnSocketData(char *data, size_t len){
 		};
 		
 		{
-			if(headers.m_hUpgrade != nullptr){
-				if(!detail::equalsi(headers.m_hUpgrade, "websocket")){
+			if(auto upgrade = headers.Get("upgrade")){
+				if(!detail::equalsi(upgrade, "websocket")){
 					return MalformedRequest();
 				}
 			}else{
@@ -596,23 +596,26 @@ void Client::OnSocketData(char *data, size_t len){
 		// WebSocket upgrades must be GET
 		if(strcmp(method, "GET") != 0) return MalformedRequest();
 		
-		if(headers.m_hConnection == nullptr) return MalformedRequest();
+		auto connectionHeader = headers.Get("connection");
+		if(connectionHeader == nullptr) return MalformedRequest();
 		
 		// Hackish, ideally we should check it's surrounded by commas (or start/end of string)
-		if(!detail::HeaderContains(headers.m_hConnection, "upgrade")) return MalformedRequest();
+		if(!detail::HeaderContains(connectionHeader, "upgrade")) return MalformedRequest();
 		
 		bool sendMyVersion = false;
 		
-		if(headers.m_hSecWebSocketVersion == nullptr) return MalformedRequest();
-		if(!detail::equalsi(headers.m_hSecWebSocketVersion, "13")){
+		auto websocketVersion = headers.Get("sec-websocket-version");
+		if(websocketVersion == nullptr) return MalformedRequest();
+		if(!detail::equalsi(websocketVersion, "13")){
 			sendMyVersion = true;
 		}
 		
-		if(headers.m_hSecWebSocketKey == nullptr) return MalformedRequest();
+		auto websocketKey = headers.Get("sec-websocket-key");
+		if(websocketKey == nullptr) return MalformedRequest();
 		
-		std::string securityKey = headers.m_hSecWebSocketKey;
+		std::string securityKey = websocketKey;
 		
-		if(m_pServer->m_fnCheckConnection && !m_pServer->m_fnCheckConnection(req)){
+		if(m_pServer->m_fnCheckConnection && !m_pServer->m_fnCheckConnection(this, req)){
 			Write("HTTP/1.1 403 Forbidden\r\n\r\n");
 			Destroy();
 			return;

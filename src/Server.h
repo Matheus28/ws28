@@ -43,7 +43,7 @@ namespace ws28 {
 	
 	class Server {
 		typedef bool (*CheckTCPConnectionFn)(const char *ip, bool secure);
-		typedef bool (*CheckConnectionFn)(HTTPRequest&);
+		typedef bool (*CheckConnectionFn)(Client *, HTTPRequest&);
 		typedef void (*ClientConnectedFn)(Client *, HTTPRequest&);
 		typedef void (*ClientDisconnectedFn)(Client *);
 		typedef void (*ClientDataFn)(Client *, const char *data, size_t len, int opcode);
