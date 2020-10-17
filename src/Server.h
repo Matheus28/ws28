@@ -46,7 +46,7 @@ namespace ws28 {
 		typedef bool (*CheckConnectionFn)(Client *, HTTPRequest&);
 		typedef void (*ClientConnectedFn)(Client *, HTTPRequest&);
 		typedef void (*ClientDisconnectedFn)(Client *);
-		typedef void (*ClientDataFn)(Client *, const char *data, size_t len, int opcode);
+		typedef void (*ClientDataFn)(Client *, char *data, size_t len, int opcode);
 		typedef void (*HTTPRequestFn)(HTTPRequest&, HTTPResponse&);
 	public:
 		
@@ -119,7 +119,7 @@ namespace ws28 {
 		
 		std::unique_ptr<Client> NotifyClientPreDestroyed(Client *client);
 		
-		void NotifyClientData(Client *client, const char *data, size_t len, int opcode){
+		void NotifyClientData(Client *client, char *data, size_t len, int opcode){
 			if(m_fnClientData) m_fnClientData(client, data, len, opcode);
 		}
 		

@@ -66,7 +66,7 @@ namespace ws28 {
 		
 		void OnRawSocketData(char *data, size_t len);
 		void OnSocketData(char *data, size_t len);
-		void ProcessDataFrame(uint8_t opcode, const char *data, size_t len);
+		void ProcessDataFrame(uint8_t opcode, char *data, size_t len);
 		
 		void InitSecure();
 		void FlushTLS();

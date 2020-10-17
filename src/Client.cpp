@@ -760,7 +760,7 @@ void Client::OnSocketData(char *data, size_t len){
 }
 
 
-void Client::ProcessDataFrame(uint8_t opcode, const char *data, size_t len){
+void Client::ProcessDataFrame(uint8_t opcode, char *data, size_t len){
 	switch(opcode){
 	case 9: // Ping
 		if(m_bIsClosing) return;
