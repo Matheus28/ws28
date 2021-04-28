@@ -31,7 +31,7 @@ int main(){
 		//printf("Client %d disconnected\n", (int) (intptr_t) client->GetUserData());
 	});
 	
-	s.SetClientDataCallback([](ws28::Client *client, const char *data, size_t len, int opcode){
+	s.SetClientDataCallback([](ws28::Client *client, char *data, size_t len, int opcode){
 		//printf("Client %d: %.*s\n", (int) (intptr_t) client->GetUserData(), (int) len, data);
 		client->Send(data, len, opcode);
 	});
