@@ -767,7 +767,11 @@ void Client::ProcessDataFrame(uint8_t opcode, char *data, size_t len){
 		Send(data, len, 10); // Send Pong
 	break;
 	
-	case 10: break; // Pong
+	case 10: // Pong
+	    if(m_bIsClosing) return;
+	    
+	    m_pServer->NotifyClientData(this, data, len, opcode); 
+	break;
 	
 	case 8: // Close
 		if(m_bIsClosing){

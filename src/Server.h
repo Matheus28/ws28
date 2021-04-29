@@ -82,7 +82,7 @@ namespace ws28 {
 		void SetClientDisconnectedCallback(ClientDisconnectedFn v){ m_fnClientDisconnected = v; }
 		
 		// This callback is called when the client receives a data frame
-		// Note that both text and binary op codes end up here
+		// Note that text, binary, and pong op codes end up here
 		void SetClientDataCallback(ClientDataFn v){ m_fnClientData = v; }
 		
 		// This callback is called when a normal http request is received
