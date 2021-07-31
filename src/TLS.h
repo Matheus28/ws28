@@ -2,11 +2,14 @@
 #define H_3078F0E9644347BD9F28E4C56F162FC8
 
 #include <vector>
+#include <mutex>
 
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
+
+namespace ws28 {
 
 // Ported from https://github.com/darrenjs/openssl_examples
 // MIT licensed
@@ -17,13 +20,21 @@ class TLS {
 	
 public:
 	
-	TLS(SSL_CTX *ctx){
+	TLS(SSL_CTX *ctx, bool server = true, const char *hostname = nullptr){
 		m_ReadBIO = BIO_new(BIO_s_mem());
 		m_WriteBIO = BIO_new(BIO_s_mem());
 		m_SSL = SSL_new(ctx);
 		
-		SSL_set_accept_state(m_SSL);
+		if(server){
+			SSL_set_accept_state(m_SSL);
+		}else{
+			SSL_set_connect_state(m_SSL);
+		}
+		
+		if(!server && hostname) SSL_set_tlsext_host_name(m_SSL, hostname);
 		SSL_set_bio(m_SSL, m_ReadBIO, m_WriteBIO);
+		
+		if(!server) DoSSLHandhake();
 	}
 	
 	~TLS(){
@@ -32,6 +43,18 @@ public:
 	
 	TLS(const TLS &other) = delete;
 	TLS& operator=(const TLS &other) = delete;
+	
+	// Helper to setup SSL, you still need to create the context
+	static void InitSSL(){
+		static std::once_flag f;
+		std::call_once(f, [](){
+			SSL_library_init();
+			OpenSSL_add_all_algorithms();
+			SSL_load_error_strings();
+			ERR_load_BIO_strings();
+			ERR_load_crypto_strings();
+		});
+	}
 	
 	// Writes unencrypted bytes to be encrypted and sent out
 	// If this returns false, the connection must be closed
@@ -99,6 +122,10 @@ public:
 			
 			f(buf.data(), buf.size());
 		}
+	}
+	
+	bool IsHandshakeFinished(){
+		return SSL_is_init_finished(m_SSL);
 	}
 	
 private:
@@ -185,5 +212,7 @@ private:
 	BIO *m_ReadBIO;
 	BIO *m_WriteBIO;
 };
+
+}
 
 #endif
