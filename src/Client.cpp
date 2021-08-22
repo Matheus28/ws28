@@ -1,10 +1,11 @@
 #include "Client.h"
 #include "Server.h"
-#include "sha1.h"
 #include "base64.h"
 #include <string>
 #include <sstream>
 #include <cassert>
+
+#include <openssl/sha.h>
 
 namespace ws28 {
 	
@@ -428,13 +429,14 @@ void Client::OnSocketData(char *data, size_t len){
 	}
 	
 	auto Consume = [&](size_t amount){
+		assert(bufferLen >= amount);
 		if(usingLocalBuffer){
 			buffer += amount;
 			bufferLen -= amount;
 		}else{
 			m_Buffer.erase(m_Buffer.begin(), m_Buffer.begin() + amount);
 			buffer = m_Buffer.data();
-			bufferLen -= amount;
+			bufferLen = m_Buffer.size();
 			
 			if(bufferLen == 0){
 				m_Buffer.shrink_to_fit();
@@ -624,7 +626,11 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		securityKey += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 		unsigned char hash[20];
-		sha1::calc(securityKey.data(), securityKey.size(), hash);
+        SHA_CTX sha1;
+        SHA1_Init(&sha1);
+        SHA1_Update(&sha1, securityKey.data(), securityKey.size());
+        SHA1_Final(hash, &sha1);
+		
 		auto solvedHash = base64_encode(hash, sizeof(hash));
 		
 		char buf[256]; // We can use up to 101 + 27 + 28 + 1 characters, and we round up just because
@@ -660,7 +666,7 @@ void Client::OnSocketData(char *data, size_t len){
 		if(m_bUsingAlternativeProtocol){
 			if(bufferLen < 4) return Bail();
 			uint32_t frameLength = ((uint32_t)(uint8_t) buffer[0]) | ((uint32_t)(uint8_t) buffer[1] << 8) | ((uint32_t)(uint8_t) buffer[2] << 16) | ((uint32_t)(uint8_t) buffer[3] << 24);
-			if(frameLength > 1 * 1024 * 1024) return Close(1002, "Too large");
+			if(frameLength > m_pServer->m_iMaxMessageSize) return Close(1002, "Too large");
 			if(bufferLen < 4 + frameLength) return Bail();
 			
 			ProcessDataFrame(2, buffer + 4, frameLength);
