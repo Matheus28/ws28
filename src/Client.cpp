@@ -457,6 +457,11 @@ void Client::OnSocketData(char *data, size_t len){
 		m_bUsingAlternativeProtocol = true;
 		Consume(1);
 		
+		if(m_pServer->m_fnCheckAlternativeConnection && !m_pServer->m_fnCheckAlternativeConnection(this)){
+			Destroy();
+			return;
+		}
+		
 		RequestHeaders headers;
 		HTTPRequest req{
 			m_pServer,

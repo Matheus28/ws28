@@ -44,6 +44,7 @@ namespace ws28 {
 	class Server {
 		typedef bool (*CheckTCPConnectionFn)(const char *ip, bool secure);
 		typedef bool (*CheckConnectionFn)(Client *, HTTPRequest&);
+		typedef bool (*CheckAlternativeConnectionFn)(Client *);
 		typedef void (*ClientConnectedFn)(Client *, HTTPRequest&);
 		typedef void (*ClientDisconnectedFn)(Client *);
 		typedef void (*ClientDataFn)(Client *, char *data, size_t len, int opcode);
@@ -70,6 +71,9 @@ namespace ws28 {
 		// By default, for safety, this checks the Origin and makes sure it matches the Host
 		// It's likely you wanna change this check if your websocket server is in a different domain.
 		void SetCheckConnectionCallback(CheckConnectionFn v){ m_fnCheckConnection = v; }
+		
+		// This is called instead of CheckConnection for connections using the alternative protocol (if enabled)
+		void SetCheckAlternativeConnectionCallback(CheckAlternativeConnectionFn v){ m_fnCheckAlternativeConnection = v; }
 		
 		// This callback is called when a client establishes a connection (after websocket handshake)
 		// This is paired with the disconnected callback
@@ -132,6 +136,7 @@ namespace ws28 {
 		
 		CheckTCPConnectionFn m_fnCheckTCPConnection = nullptr;
 		CheckConnectionFn m_fnCheckConnection = nullptr;
+		CheckAlternativeConnectionFn m_fnCheckAlternativeConnection = nullptr;
 		ClientConnectedFn m_fnClientConnected = nullptr;
 		ClientDisconnectedFn m_fnClientDisconnected = nullptr;
 		ClientDataFn m_fnClientData = nullptr;
