@@ -9,13 +9,13 @@ namespace ws28{
 Server::Server(uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx){
 
 	m_fnCheckConnection = [](Client*, HTTPRequest &req) -> bool {
-		const char *host = req.headers.Get("host");
-		if(host == nullptr) return true; // No host header, default to accept
+		auto host = req.headers.Get("host");
+		if(!host) return true; // No host header, default to accept
 		
-		const char *origin = req.headers.Get("origin");
-		if(origin == nullptr) return true;
+		auto origin = req.headers.Get("origin");
+		if(!origin) return true;
 		
-		return strcmp(origin, host) == 0;
+		return origin == host;
 	};
 	
 }

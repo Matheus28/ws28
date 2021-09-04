@@ -4,6 +4,7 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <string_view>
 #include <cassert>
 
 #include "Client.h"
@@ -13,9 +14,9 @@ namespace ws28 {
 	
 	struct HTTPRequest {
 		Server *server;
-		const char *method;
-		const char *path;
-		const char *ip;
+		std::string_view method;
+		std::string_view path;
+		std::string_view ip;
 		
 		// Header keys are always lower case
 		const RequestHeaders &headers;
@@ -25,16 +26,15 @@ namespace ws28 {
 	public:
 		
 		HTTPResponse& status(int v){ statusCode = v; return *this; }
-		HTTPResponse& send(const char *v){ if(statusCode == 0) statusCode = 200; body.append(v); return *this; }
-		HTTPResponse& send(const std::string &v){ return send(v.c_str()); }
+		HTTPResponse& send(std::string_view v){ body.append(v); return *this; }
 		
 		// Appends a response header. The following headers cannot be changed:
 		// Connection: close
 		// Content-Length: body.size()
-		HTTPResponse& header(const std::string &key, const std::string &value){ headers.emplace(key, value); return *this; }
+		HTTPResponse& header(std::string_view key, std::string_view value){ headers.emplace(std::string(key), std::string(value)); return *this; }
 		
 	private:
-		int statusCode = 0;
+		int statusCode = 200;
 		std::string body;
 		std::multimap<std::string, std::string> headers;
 		
@@ -42,7 +42,7 @@ namespace ws28 {
 	};
 	
 	class Server {
-		typedef bool (*CheckTCPConnectionFn)(const char *ip, bool secure);
+		typedef bool (*CheckTCPConnectionFn)(std::string_view ip, bool secure);
 		typedef bool (*CheckConnectionFn)(Client *, HTTPRequest&);
 		typedef bool (*CheckAlternativeConnectionFn)(Client *);
 		typedef void (*ClientConnectedFn)(Client *, HTTPRequest&);

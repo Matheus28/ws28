@@ -4,31 +4,31 @@
 #include <cstring>
 #include <vector>
 #include <utility>
+#include <string_view>
+#include <optional>
 
 namespace ws28 {
 	class Client;
 	
 	class RequestHeaders {
 	public:
-		void Set(const char *key, const char *value){
+		void Set(std::string_view key, std::string_view value){
 			m_Headers.push_back({ key, value });
 		}
 		
 		template<typename F>
-		void ForEachValueOf(const char *key, const F &f) const {
+		void ForEachValueOf(std::string_view key, const F &f) const {
 			for(auto &p : m_Headers){
-				if(strcmp(p.first, key) != 0) continue;
-				f(p.second);
+				if(p.first == key) f(p.second);
 			}
 		}
 		
-		const char* Get(const char *key) const {
+		std::optional<std::string_view> Get(std::string_view key) const {
 			for(auto &p : m_Headers){
-				if(strcmp(p.first, key) != 0) continue;
-				return p.second;
+				if(p.first == key) return p.second;
 			}
 			
-			return nullptr;
+			return std::nullopt;
 		}
 		
 		template<typename F>
@@ -39,7 +39,7 @@ namespace ws28 {
 		}
 		
 	private:
-		std::vector<std::pair<const char*, const char*>> m_Headers;
+		std::vector<std::pair<std::string_view, std::string_view>> m_Headers;
 		
 		friend class Client;
 		friend class Server;

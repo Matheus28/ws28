@@ -10,52 +10,67 @@
 namespace ws28 {
 	
 namespace detail {
-	bool equalsi(const char *a, const char *b){
+	bool equalsi(std::string_view a, std::string_view b){
+		if(a.size() != b.size()) return false;
 		for(;;){
-			if(tolower(*a) != tolower(*b)) return false;
-			if(!*a) return true;
+			if(tolower(a.front()) != tolower(b.front())) return false;
 			
-			++a;
-			++b;
+			a.remove_prefix(1);
+			b.remove_prefix(1);
+			if(a.empty()) return true;
 		}
 	}
 	
-	bool equalsi(const char *a, const char *b, size_t n){
+	bool equalsi(std::string_view a, std::string_view b, size_t n){
 		while(n--){
-			if(tolower(*a) != tolower(*b)) return false;
+			if(a.empty()) return b.empty();
+			else if(b.empty()) return false;
 			
-			++a;
-			++b;
+			if(tolower(a.front()) != tolower(b.front())) return false;
+			
+			a.remove_prefix(1);
+			b.remove_prefix(1);
 		}
 		
 		return true;
 	}
 	
-	bool HeaderContains(const char *header, const char *substring){
+	bool HeaderContains(std::string_view header, std::string_view substring){
 		bool hasMatch = false;
-		size_t substringLen = strlen(substring);
-		while(*header){
-			if(*header == ' ' || *header == '\t'){
-				++header;
+		
+		while(!header.empty()){
+			if(header.front() == ' ' || header.front() == '\t'){
+				header.remove_prefix(1);
 				continue;
 			}
 			
 			if(hasMatch){
-				if(*header == ',') return true;
+				if(header.front() == ',') return true;
 				hasMatch = false;
-				++header;
+				header.remove_prefix(1);
 				
 				// Skip to comma or end of string
-				while(*header && *header != ',') ++header;
-				if(*header == ',') ++header;
+				while(!header.empty() && header.front() != ',') header.remove_prefix(1);
+				if(header.empty()) return false;
+				
+				// Skip comma
+				assert(header.front() == ',');
+				header.remove_prefix(1);
 			}else{
-				if(detail::equalsi(header, substring, substringLen)){
+				if(detail::equalsi(header, substring, substring.size())){
+					// We have a match... if the header ends here, or has a comma
 					hasMatch = true;
-					header += substringLen;
+					header.remove_prefix(substring.size());
 				}else{
-					++header;
-					while(*header && *header != ',') ++header;
-					if(*header == ',') ++header;
+					header.remove_prefix(1);
+					
+					// Skip to comma or end of string
+					while(!header.empty() && header.front() != ',') header.remove_prefix(1);
+					if(header.empty()) return false;
+					
+					// Skip comma
+					assert(header.front() == ',');
+					header.remove_prefix(1);
 				}
 			}
 		}
@@ -412,43 +427,38 @@ void Client::OnSocketData(char *data, size_t len){
 	// perform any copying. The Bail function needs to be called before we leave this
 	// function (unless we're destroying the client), to copy the unused part of the buffer
 	// back to our class-level buffer
-	char *buffer;
-	size_t bufferLen;
+	std::string_view buffer;
 	bool usingLocalBuffer;
 	
 	if(m_Buffer.empty()){
 		usingLocalBuffer = true;
-		buffer = data;
-		bufferLen = len;
+		buffer = std::string_view(data, len);
 	}else{
 		usingLocalBuffer = false;
 		
 		m_Buffer.insert(m_Buffer.end(), data, data + len);
-		buffer = m_Buffer.data();
-		bufferLen = m_Buffer.size();
+		buffer = std::string_view(m_Buffer.data(), m_Buffer.size());
 	}
 	
 	auto Consume = [&](size_t amount){
-		assert(bufferLen >= amount);
-		if(usingLocalBuffer){
-			buffer += amount;
-			bufferLen -= amount;
-		}else{
-			m_Buffer.erase(m_Buffer.begin(), m_Buffer.begin() + amount);
-			buffer = m_Buffer.data();
-			bufferLen = m_Buffer.size();
-			
-			if(bufferLen == 0){
-				m_Buffer.shrink_to_fit();
-			}
-		}
+		assert(buffer.size() >= amount);
+		buffer.remove_prefix(amount);
 	};
 	
 	auto Bail = [&](){
 		// Copy partial HTTP headers to our buffer
-		if(usingLocalBuffer && bufferLen > 0){
-			assert(m_Buffer.empty());
-			m_Buffer.insert(m_Buffer.end(), buffer, buffer + bufferLen);
+		if(usingLocalBuffer){
+			if(!buffer.empty()){
+				assert(m_Buffer.empty());
+				m_Buffer.insert(m_Buffer.end(), buffer.data(), buffer.data() + buffer.size());
+			}
+		}else{
+			if(buffer.empty()){
+				m_Buffer.clear();
+			}else if(buffer.size() != m_Buffer.size()){
+				memmove(m_Buffer.data(), buffer.data(), buffer.size());
+				m_Buffer.resize(buffer.size());
+			}
 		}
 	};
 	
@@ -474,84 +484,81 @@ void Client::OnSocketData(char *data, size_t len){
 		m_pServer->NotifyClientInit(this, req);
 	}else if(!m_bHasCompletedHandshake){
 		// HTTP headers not done yet, wait
-		if(strstr((char*)buffer, "\r\n\r\n") == nullptr) return Bail();
+		auto endOfHeaders = buffer.find("\r\n\r\n");
+		if(endOfHeaders == std::string_view::npos) return Bail();
 		
 		auto MalformedRequest = [&](){
 			Write("HTTP/1.1 400 Bad Request\r\n\r\n");
 			Destroy();
 		};
 		
-		char *str = buffer;
+		auto headersBuffer = buffer.substr(0, endOfHeaders+4); // Include \r\n\r\n
 		
-		const char *method;
-		const char *path;
+		std::string_view method;
+		std::string_view path;
 		
 		{
-			auto methodEnd = strstr(str, " ");
+			auto methodEnd = headersBuffer.find(' ');
 			
-			auto endOfLine = strstr(str, "\r\n");
-			assert(endOfLine != nullptr); // Can't fail because of a check above
+			auto endOfLine = headersBuffer.find("\r\n");
+			assert(endOfLine != std::string_view::npos); // Can't fail because of a check above
 			
-			if(methodEnd == nullptr || methodEnd > endOfLine) return MalformedRequest();
+			if(methodEnd == std::string_view::npos || methodEnd > endOfLine) return MalformedRequest();
 			
-			method = str;
-			*methodEnd = '\0';
+			method = headersBuffer.substr(0, methodEnd);
 			
 			// Uppercase method
-			std::transform(str, methodEnd, str, ::toupper);
+			std::transform(method.begin(), method.end(), (char*) method.data(), [](char v) -> char{
+				if(v < 0 || v >= 127) return v;
+				return toupper(v);
+			});
 			
 			auto pathStart = methodEnd + 1;
-			auto pathEnd = strstr(pathStart, " ");
+			auto pathEnd = headersBuffer.find(' ', pathStart);
 			
-			if(pathEnd == nullptr || pathEnd > endOfLine) return MalformedRequest();
+			if(pathEnd == std::string_view::npos || pathEnd > endOfLine) return MalformedRequest();
 			
-			path = pathStart;
-			*pathEnd = '\0';
+			path = headersBuffer.substr(pathStart, pathEnd - pathStart);
 			
 			// Skip line
-			str = endOfLine + 2;
+			headersBuffer = headersBuffer.substr(endOfLine + 2);
 		}
 		
 		RequestHeaders headers;
 		
 		for(;;) {
-			auto nextLine = strstr(str, "\r\n");
+			auto nextLine = headersBuffer.find("\r\n");
 			
 			// This means that we have finished parsing the headers
-			if(nextLine == str) {
+			if(nextLine == 0) {
 				break;
 			}
 			
-			if(nextLine == nullptr) return MalformedRequest();
+			// This can't happen... right?
+			if(nextLine == std::string_view::npos) return MalformedRequest();
 			
-			auto colonPos = strstr(str, ":");
-			if(colonPos == nullptr || colonPos > nextLine) return MalformedRequest();
+			auto colonPos = headersBuffer.find(':');
+			if(colonPos == std::string_view::npos || colonPos > nextLine) return MalformedRequest();
 			
-			auto keyStart = str;
-			auto keyEnd = colonPos;
+			auto key = headersBuffer.substr(0, colonPos);
 			
 			// Key to lower case
-			std::transform(keyStart, keyEnd, keyStart, [](char v) -> char {
+			std::transform(key.begin(), key.end(), (char*) key.data(), [](char v) -> char {
 				if(v < 0 || v >= 127) return v;
 				return tolower(v);
 			});
 			
-			auto valueStart = colonPos + 1;
-			auto valueEnd = nextLine;
-			
+			auto value = headersBuffer.substr(colonPos + 1, nextLine - (colonPos + 1));
 			
 			// Trim spaces
-			while(keyStart != keyEnd && *keyStart == ' ') ++keyStart;
-			while(keyStart != keyEnd && *(keyEnd - 1) == ' ') --keyEnd;
-			while(valueStart != valueEnd && *valueStart == ' ') ++valueStart;
-			while(valueStart != valueEnd && *(valueEnd - 1) == ' ') --valueEnd;
+			while(!key.empty() && key.front() == ' ') key.remove_prefix(1);
+			while(!key.empty() && key.back() == ' ') key.remove_suffix(1);
+			while(!value.empty() && value.front() == ' ') value.remove_prefix(1);
+			while(!value.empty() && value.back() == ' ') value.remove_suffix(1);
 			
-			*keyEnd = '\0';
-			*valueEnd = '\0';
+			headers.Set(key, value);
 			
-			headers.Set(keyStart, valueStart);
-			
-			str = nextLine + 2;
+			headersBuffer = headersBuffer.substr(nextLine+2);
 		}
 		
 		HTTPRequest req{
@@ -564,7 +571,7 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		{
 			if(auto upgrade = headers.Get("upgrade")){
-				if(!detail::equalsi(upgrade, "websocket")){
+				if(!detail::equalsi(*upgrade, "websocket")){
 					return MalformedRequest();
 				}
 			}else{
@@ -601,26 +608,26 @@ void Client::OnSocketData(char *data, size_t len){
 		}
 		
 		// WebSocket upgrades must be GET
-		if(strcmp(method, "GET") != 0) return MalformedRequest();
+		if(method != "GET") return MalformedRequest();
 		
 		auto connectionHeader = headers.Get("connection");
-		if(connectionHeader == nullptr) return MalformedRequest();
+		if(!connectionHeader) return MalformedRequest();
 		
 		// Hackish, ideally we should check it's surrounded by commas (or start/end of string)
-		if(!detail::HeaderContains(connectionHeader, "upgrade")) return MalformedRequest();
+		if(!detail::HeaderContains(*connectionHeader, "upgrade")) return MalformedRequest();
 		
 		bool sendMyVersion = false;
 		
 		auto websocketVersion = headers.Get("sec-websocket-version");
-		if(websocketVersion == nullptr) return MalformedRequest();
-		if(!detail::equalsi(websocketVersion, "13")){
+		if(!websocketVersion) return MalformedRequest();
+		if(!detail::equalsi(*websocketVersion, "13")){
 			sendMyVersion = true;
 		}
 		
 		auto websocketKey = headers.Get("sec-websocket-key");
-		if(websocketKey == nullptr) return MalformedRequest();
+		if(!websocketKey) return MalformedRequest();
 		
-		std::string securityKey = websocketKey;
+		std::string securityKey = std::string(*websocketKey);
 		
 		if(m_pServer->m_fnCheckConnection && !m_pServer->m_fnCheckConnection(this, req)){
 			Write("HTTP/1.1 403 Forbidden\r\n\r\n");
@@ -669,18 +676,18 @@ void Client::OnSocketData(char *data, size_t len){
 		if(!m_Socket) return; // No need to destroy even
 		
 		if(m_bUsingAlternativeProtocol){
-			if(bufferLen < 4) return Bail();
+			if(buffer.size() < 4) return Bail();
 			uint32_t frameLength = ((uint32_t)(uint8_t) buffer[0]) | ((uint32_t)(uint8_t) buffer[1] << 8) | ((uint32_t)(uint8_t) buffer[2] << 16) | ((uint32_t)(uint8_t) buffer[3] << 24);
 			if(frameLength > m_pServer->m_iMaxMessageSize) return Close(1002, "Too large");
-			if(bufferLen < 4 + frameLength) return Bail();
+			if(buffer.size() < 4 + frameLength) return Bail();
 			
-			ProcessDataFrame(2, buffer + 4, frameLength);
+			ProcessDataFrame(2, (char*)buffer.data() + 4, frameLength);
 			Consume(4 + frameLength);
 		}else{ // Websockets
 			// Not enough to read the header
-			if(bufferLen < 2) return Bail();
+			if(buffer.size() < 2) return Bail();
 			
-			DataFrameHeader header(buffer);
+			DataFrameHeader header((char*) buffer.data());
 			
 			if(header.rsv1() || header.rsv2() || header.rsv3()) return Close(1002, "Reserved bit used");
 			
@@ -688,15 +695,15 @@ void Client::OnSocketData(char *data, size_t len){
 			if(!header.mask()) return Close(1002, "Clients must mask their payload");
 			assert(header.mask());
 			
-			char *curPosition = buffer + 2;
+			char *curPosition = (char*) buffer.data() + 2;
 
 			size_t frameLength = header.len();
 			if(frameLength == 126){
-				if(bufferLen < 4) return Bail();
+				if(buffer.size() < 4) return Bail();
 				frameLength = (*(uint8_t*)(curPosition) << 8) | (*(uint8_t*)(curPosition + 1));
 				curPosition += 2;
 			}else if(frameLength == 127){
-				if(bufferLen < 10) return Bail();
+				if(buffer.size() < 10) return Bail();
 
 				frameLength = ((uint64_t)*(uint8_t*)(curPosition) << 56) | ((uint64_t)*(uint8_t*)(curPosition + 1) << 48)
 					| ((uint64_t)*(uint8_t*)(curPosition + 2) << 40) | ((uint64_t)*(uint8_t*)(curPosition + 3) << 32)
@@ -706,7 +713,7 @@ void Client::OnSocketData(char *data, size_t len){
 				curPosition += 8;
 			}
 
-			auto amountLeft = bufferLen - (curPosition - buffer);
+			auto amountLeft = buffer.size() - (curPosition - buffer.data());
 			const char *maskKey = nullptr;
 			
 			{ // Read mask
@@ -763,7 +770,7 @@ void Client::OnSocketData(char *data, size_t len){
 				
 			}
 			
-			Consume((curPosition - buffer) + frameLength);
+			Consume((curPosition - buffer.data()) + frameLength);
 		}
 	}
 	
