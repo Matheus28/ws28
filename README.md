@@ -1,5 +1,5 @@
 # ws28
-C++14 WebSocket server library
+C++17 WebSocket server library
 
 ## Do you use this in production?
 
@@ -41,7 +41,7 @@ You can also check `echo.cpp` for an echo server implementation.
 
 ## What's the license?
 
-Most files are MIT. The base64 and sha1 code are BSD, feel free to pull request some MIT licensed code to replace those.
+Most files are MIT. The base64 code is BSD, feel free to pull request some MIT licensed code to replace it.
 
 
 ## More FAQ
