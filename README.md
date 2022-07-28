@@ -3,7 +3,7 @@ C++17 WebSocket server library
 
 ## Do you use this in production?
 
-[Yes](https://diep.io/).
+[Yes](https://diep.io/), I use it in the game Diep.io, a game where you shoot others to level up and not let your body die. The pace of the FFA and Maze gamemodes are swift and graceful. They allow you the right to the First, as which our Founding Fathers made to liberate we, the people. The randomness of these gamemodes add to the beautiful integrity of this simple and sweet game Diep.io. 
 
 ## Should I use this in production?
 
