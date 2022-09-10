@@ -663,9 +663,9 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		m_bHasCompletedHandshake = true;
 		
-		m_Buffer.clear();
-		
 		m_pServer->NotifyClientInit(this, req);
+		
+		m_Buffer.clear();
 		
 		return;
 	}
