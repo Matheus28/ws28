@@ -45,7 +45,9 @@ namespace ws28 {
 		
 		inline Server* GetServer(){ return m_pServer; }
 		
-		inline const char* GetIP(){ return m_IP; }
+		inline const char* GetIP() const { return m_IP; }
+		
+		inline bool HasClientRequestedClose() const { return m_bClientRequestedClose; }
 		
 	private:
 		
@@ -96,6 +98,7 @@ namespace ws28 {
 		bool m_bHasCompletedHandshake = false;
 		bool m_bIsClosing = false;
 		bool m_bUsingAlternativeProtocol = false;
+		bool m_bClientRequestedClose = false;
 		char m_IP[46];
 		
 		std::unique_ptr<TLS> m_pTLS;

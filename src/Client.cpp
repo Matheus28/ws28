@@ -660,6 +660,7 @@ void Client::OnSocketData(char *data, size_t len){
 		assert(bufLen >= 0 && (size_t) bufLen < sizeof(buf));
 		
 		Write(buf, bufLen);
+		if(!m_Socket) return; // if write failed, we're being destroyed
 		
 		m_bHasCompletedHandshake = true;
 		
@@ -788,6 +789,7 @@ void Client::ProcessDataFrame(uint8_t opcode, char *data, size_t len){
 	case 10: break; // Pong
 	
 	case 8: // Close
+		m_bClientRequestedClose = true;
 		if(m_bIsClosing){
 			Destroy();
 		}else{
