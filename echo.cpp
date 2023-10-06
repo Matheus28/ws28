@@ -41,7 +41,7 @@ int main(){
 		ss << "Hi, you issued a " << req.method << " to " << req.path << "\r\n";
 		ss << "Headers:\r\n";
 		
-		req.headers.ForEach([&](const char *key, const char *value){
+		req.headers.ForEach([&](std::string_view key, std::string_view value){
 			ss << key << ": " << value << "\r\n";
 		});
 		
