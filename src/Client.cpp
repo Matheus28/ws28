@@ -638,10 +638,18 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		securityKey += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 		unsigned char hash[20];
-        SHA_CTX sha1;
-        SHA1_Init(&sha1);
-        SHA1_Update(&sha1, securityKey.data(), securityKey.size());
-        SHA1_Final(hash, &sha1);
+#if OPENSSL_VERSION_NUMBER <= 0x030000000L
+		SHA_CTX sha1;
+		SHA1_Init(&sha1);
+		SHA1_Update(&sha1, securityKey.data(), securityKey.size());
+		SHA1_Final(hash, &sha1);
+#else
+		EVP_MD_CTX *sha1 = EVP_MD_CTX_new();
+		EVP_DigestInit_ex(sha1, EVP_sha1(), NULL);
+		EVP_DigestUpdate(sha1, securityKey.data(), securityKey.size());
+		EVP_DigestFinal_ex(sha1, hash, NULL);
+		EVP_MD_CTX_free(sha1);
+#endif
 		
 		auto solvedHash = base64_encode(hash, sizeof(hash));
 		
