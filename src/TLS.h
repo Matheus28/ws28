@@ -51,7 +51,9 @@ public:
 			SSL_library_init();
 			OpenSSL_add_all_algorithms();
 			SSL_load_error_strings();
+#if OPENSSL_VERSION_NUMBER < 0x30000000L || defined(LIBRESSL_VERSION_NUMBER)
 			ERR_load_BIO_strings();
+#endif
 			ERR_load_crypto_strings();
 		});
 	}
