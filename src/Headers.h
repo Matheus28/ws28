@@ -9,6 +9,7 @@
 
 namespace ws28 {
 	class Client;
+	class Server;
 	
 	class RequestHeaders {
 	public:
