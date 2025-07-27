@@ -4,6 +4,7 @@
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 
+#include <array>
 #include <string>
 #include <sstream>
 #include <cassert>
@@ -11,16 +12,12 @@
 namespace ws28 {
 	
 namespace detail {
-	std::string base64_encode(const unsigned char *input, size_t length){
-		size_t lengthReserved = ((length + 2) / 3) * 4;
-		
-		std::string output;
-		// resize adds +1 for the terminator that EVP_EncodeBlock will also add anyway
-		// it is safe to write \0 to the past-the-end terminator
-		// per https://en.cppreference.com/w/cpp/string/basic_string/data.html
-		output.resize(lengthReserved);
-		int res = EVP_EncodeBlock((unsigned char*) output.data(), input, (int) length);
-		assert(lengthReserved == (size_t) res);
+	template<size_t Length>
+	static auto base64_encode_static(const unsigned char (&input)[Length]){
+		constexpr size_t LengthReserved = ((Length + 2) / 3) * 4 + 1;
+		std::array<char, LengthReserved> output;
+		int res = EVP_EncodeBlock((unsigned char*) output.data(), input, Length);
+		assert(LengthReserved - 1 == (size_t) res);
 		return output;
 	}
 	
@@ -665,7 +662,7 @@ void Client::OnSocketData(char *data, size_t len){
 		EVP_MD_CTX_free(sha1);
 #endif
 		
-		auto solvedHash = detail::base64_encode(hash, sizeof(hash));
+		auto solvedHash = detail::base64_encode_static(hash);
 		
 		char buf[256]; // We can use up to 101 + 27 + 28 + 1 characters, and we round up just because
 		int bufLen = snprintf(buf, sizeof(buf),
@@ -676,7 +673,7 @@ void Client::OnSocketData(char *data, size_t len){
 			"Sec-WebSocket-Accept: %s\r\n\r\n",
 			
 			sendMyVersion ? "Sec-WebSocket-Version: 13\r\n" : "",
-			solvedHash.c_str()
+			solvedHash.data()
 		);
 		
 		assert(bufLen >= 0 && (size_t) bufLen < sizeof(buf));
