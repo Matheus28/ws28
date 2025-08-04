@@ -17,6 +17,7 @@ namespace detail {
 		constexpr size_t LengthReserved = ((Length + 2) / 3) * 4 + 1;
 		std::array<char, LengthReserved> output;
 		int res = EVP_EncodeBlock((unsigned char*) output.data(), input, Length);
+		(void) res;
 		assert(LengthReserved - 1 == (size_t) res);
 		return output;
 	}
