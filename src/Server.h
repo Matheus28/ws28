@@ -121,7 +121,7 @@ namespace ws28 {
 			if(m_fnClientConnected) m_fnClientConnected(client, req);
 		}
 		
-		std::unique_ptr<Client> NotifyClientPreDestroyed(Client *client);
+		void NotifyClientPreDestroyed(Client *client);
 		
 		void NotifyClientData(Client *client, char *data, size_t len, int opcode){
 			if(m_fnClientData) m_fnClientData(client, data, len, opcode);
@@ -131,7 +131,7 @@ namespace ws28 {
 		SocketHandle m_Server;
 		SSL_CTX *m_pSSLContext;
 		void *m_pUserData = nullptr;
-		std::vector<std::unique_ptr<Client>> m_Clients;
+		std::vector<std::shared_ptr<Client>> m_Clients;
 		bool m_bAllowAlternativeProtocol = false;
 		
 		CheckTCPConnectionFn m_fnCheckTCPConnection = nullptr;

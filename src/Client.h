@@ -26,7 +26,7 @@ namespace ws28 {
 	typedef std::unique_ptr<uv_tcp_t, detail::SocketDeleter> SocketHandle;
 	
 	class Server;
-	class Client {
+	class Client : public std::enable_shared_from_this<Client> {
 		enum { MAX_HEADER_SIZE = 10 };
 		enum : unsigned char { NO_FRAMES = 0 };
 	public:

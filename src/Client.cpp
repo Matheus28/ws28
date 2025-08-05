@@ -202,11 +202,12 @@ void Client::Destroy(){
 	
 	m_Socket->data = nullptr;
 	
-	auto myself = m_pServer->NotifyClientPreDestroyed(this);
+	auto myself = shared_from_this();
+	m_pServer->NotifyClientPreDestroyed(this);
 	
 	struct ShutdownRequest : uv_shutdown_t {
 		SocketHandle socket;
-		std::unique_ptr<Client> client;
+		std::shared_ptr<Client> client;
 		Server::ClientDisconnectedFn cb;
 	};
 	
@@ -292,7 +293,7 @@ void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
 	
 	struct CustomWriteRequest {
 		uv_write_t req;
-		Client *client;
+		std::shared_ptr<Client> client;
 		std::unique_ptr<char[]> data;
 	};
 	
@@ -301,7 +302,7 @@ void Client::WriteRawQueue(std::unique_ptr<char[]> data, size_t len){
 	buf.len = len;
 
 	auto request = new CustomWriteRequest();
-	request->client = this;
+	request->client = shared_from_this();
 	request->data = std::move(data);
 	
 	if(uv_write(&request->req, (uv_stream_t*) m_Socket.get(), &buf, 1, [](uv_write_t* req, int status){
