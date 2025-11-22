@@ -181,6 +181,12 @@ Client::Client(Server *server, SocketHandle socket) : m_pServer(server), m_Socke
 		
 		if(client != nullptr){
 			if(nread < 0){
+				// EOF or error - flush any incomplete fragmented frames
+				if(client->IsBuildingFrames() && client->m_pServer){
+					client->ProcessDataFrame(client->m_iFrameOpcode, client->m_FrameBuffer.data(), client->m_FrameBuffer.size());
+					client->m_iFrameOpcode = 0;
+					client->m_FrameBuffer.clear();
+				}
 				client->Destroy();
 			}else if(nread > 0){
 				client->OnRawSocketData(buf->base, (size_t) nread);
@@ -426,7 +432,7 @@ void Client::OnSocketData(char *data, size_t len){
 	if(m_pServer == nullptr) return;
 	
 	// This gives us an extra byte just in case
-	if(m_Buffer.size() + len + 1 >= m_pServer->m_iMaxMessageSize){
+	if(m_Buffer.size() + len + 1 > m_pServer->m_iMaxMessageSize){
 		if(m_bHasCompletedHandshake){
 			Close(1009, "Message too large");
 		}
@@ -777,7 +783,7 @@ void Client::OnSocketData(char *data, size_t len){
 					m_iFrameOpcode = header.opcode();
 				}
 				
-				if(m_FrameBuffer.size() + frameLength >= m_pServer->m_iMaxMessageSize) return Close(1009, "Message too large");
+				if(m_FrameBuffer.size() + frameLength > m_pServer->m_iMaxMessageSize) return Close(1009, "Message too large");
 				
 				m_FrameBuffer.insert(m_FrameBuffer.end(), curPosition, curPosition + frameLength);
 				
