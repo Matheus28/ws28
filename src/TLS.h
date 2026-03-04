@@ -20,10 +20,10 @@ class TLS {
 	
 public:
 	
-	TLS(SSL_CTX *ctx, bool server = true, const char *hostname = nullptr){
+	TLS(std::shared_ptr<SSL_CTX> ctx, bool server = true, const char *hostname = nullptr) : m_pSSLContext(ctx){
 		m_ReadBIO = BIO_new(BIO_s_mem());
 		m_WriteBIO = BIO_new(BIO_s_mem());
-		m_SSL = SSL_new(ctx);
+		m_SSL = SSL_new(m_pSSLContext.get());
 		
 		if(server){
 			SSL_set_accept_state(m_SSL);
@@ -210,6 +210,7 @@ private:
 	std::vector<char> m_EncryptBuf; // Bytes waiting to be encrypted
 	std::vector<char> m_WriteBuf; // Bytes waiting to be written to the socket
 	
+	std::shared_ptr<SSL_CTX> m_pSSLContext; // Keep context alive for as long as this exists
 	SSL *m_SSL;
 	BIO *m_ReadBIO;
 	BIO *m_WriteBIO;

@@ -54,7 +54,7 @@ namespace ws28 {
 		// Note: By default, this listens on both ipv4 and ipv6
 		// Note: if you provide a SSL_CTX, this server will listen to *BOTH* secure and insecure connections at that port,
 		//       sniffing the first byte to figure out whether it's secure or not
-		Server(uv_loop_t *loop, SSL_CTX *ctx = nullptr);
+		Server(uv_loop_t *loop, std::shared_ptr<SSL_CTX> ctx);
 		Server(const Server &other) = delete;
 		Server& operator=(const Server &other) = delete;
 		~Server();
@@ -95,7 +95,8 @@ namespace ws28 {
 		// Connections that call this callback never lead to a connection
 		void SetHTTPCallback(HTTPRequestFn v){ m_fnHTTPRequest = v;}
 		
-		SSL_CTX* GetSSLContext() const { return m_pSSLContext; }
+		void SetSSLContext(std::shared_ptr<SSL_CTX> ctx){ m_pSSLContext = ctx; }
+		std::shared_ptr<SSL_CTX> GetSSLContext() const { return m_pSSLContext; }
 		
 		inline void SetUserData(void *v){ m_pUserData = v; }
 		inline void* GetUserData() const { return m_pUserData; }
@@ -129,7 +130,7 @@ namespace ws28 {
 		
 		uv_loop_t *m_pLoop;
 		SocketHandle m_Server;
-		SSL_CTX *m_pSSLContext;
+		std::shared_ptr<SSL_CTX> m_pSSLContext;
 		void *m_pUserData = nullptr;
 		std::vector<std::shared_ptr<Client>> m_Clients;
 		bool m_bAllowAlternativeProtocol = false;

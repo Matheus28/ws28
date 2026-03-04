@@ -6,7 +6,7 @@
 
 namespace ws28{
 
-Server::Server(uv_loop_t *loop, SSL_CTX *ctx) : m_pLoop(loop), m_pSSLContext(ctx){
+Server::Server(uv_loop_t *loop, std::shared_ptr<SSL_CTX> ctx) : m_pLoop(loop), m_pSSLContext(ctx){
 
 	m_fnCheckConnection = [](Client*, HTTPRequest &req) -> bool {
 		auto host = req.headers.Get("host");
