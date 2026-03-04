@@ -13,10 +13,10 @@ namespace ws28 {
 	
 namespace detail {
 	template<size_t Length>
-	static auto base64_encode_static(const unsigned char (&input)[Length]){
+	static auto base64_encode_static(const std::byte (&input)[Length]){
 		constexpr size_t LengthReserved = ((Length + 2) / 3) * 4 + 1;
 		std::array<char, LengthReserved> output;
-		int res = EVP_EncodeBlock((unsigned char*) output.data(), input, Length);
+		int res = EVP_EncodeBlock((unsigned char*) output.data(), (const unsigned char*) input, Length);
 		(void) res;
 		assert(LengthReserved - 1 == (size_t) res);
 		return output;
@@ -650,17 +650,17 @@ void Client::OnSocketData(char *data, size_t len){
 		
 		
 		securityKey += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-		unsigned char hash[20];
+		std::byte hash[20];
 #if OPENSSL_VERSION_NUMBER <= 0x030000000L
 		SHA_CTX sha1;
 		SHA1_Init(&sha1);
 		SHA1_Update(&sha1, securityKey.data(), securityKey.size());
-		SHA1_Final(hash, &sha1);
+		SHA1_Final((unsigned char*) hash, &sha1);
 #else
 		EVP_MD_CTX *sha1 = EVP_MD_CTX_new();
 		EVP_DigestInit_ex(sha1, EVP_sha1(), NULL);
 		EVP_DigestUpdate(sha1, securityKey.data(), securityKey.size());
-		EVP_DigestFinal_ex(sha1, hash, NULL);
+		EVP_DigestFinal_ex(sha1, (unsigned char*) hash, NULL);
 		EVP_MD_CTX_free(sha1);
 #endif
 		
