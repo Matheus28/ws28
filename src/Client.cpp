@@ -800,6 +800,54 @@ void Client::OnSocketData(char *data, size_t len){
 }
 
 
+bool Client::IsValidUTF8(const char *data, size_t len){
+	auto p = (const unsigned char*) data;
+	auto end = p + len;
+	
+	while(p != end){
+		if(*p < 0x80){
+			++p;
+			continue;
+		}
+		
+		size_t continuationBytes;
+		uint32_t codePoint;
+		uint32_t smallestCodePoint;
+		
+		if((*p & 0xE0) == 0xC0){
+			continuationBytes = 1;
+			codePoint = *p & 0x1F;
+			smallestCodePoint = 0x80;
+		}else if((*p & 0xF0) == 0xE0){
+			continuationBytes = 2;
+			codePoint = *p & 0x0F;
+			smallestCodePoint = 0x800;
+		}else if((*p & 0xF8) == 0xF0){
+			continuationBytes = 3;
+			codePoint = *p & 0x07;
+			smallestCodePoint = 0x10000;
+		}else{
+			// A continuation byte with nothing to continue, or a 5 or 6 byte sequence
+			return false;
+		}
+		
+		if((size_t)(end - p) <= continuationBytes) return false;
+		++p;
+		
+		while(continuationBytes--){
+			if((*p & 0xC0) != 0x80) return false;
+			codePoint = (codePoint << 6) | (*p & 0x3F);
+			++p;
+		}
+		
+		if(codePoint < smallestCodePoint) return false;
+		if(codePoint >= 0xD800 && codePoint <= 0xDFFF) return false;
+		if(codePoint > 0x10FFFF) return false;
+	}
+	
+	return true;
+}
+
 void Client::ProcessDataFrame(uint8_t opcode, char *data, size_t len){
 	switch(opcode){
 	case 9: // Ping
