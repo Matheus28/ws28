@@ -86,8 +86,7 @@ namespace ws28 {
 		
 		void Cork(bool v);
 		
-		// Stub, maybe some day
-		inline bool IsValidUTF8(const char *, size_t){ return true; }
+		static bool IsValidUTF8(const char *data, size_t len);
 		
 		inline bool IsBuildingFrames(){ return m_iFrameOpcode != NO_FRAMES; }
 		
